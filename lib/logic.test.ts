@@ -114,6 +114,19 @@ describe('computeReport', () => {
     expect(nums(r.finish.done)).toEqual(['1'])
     expect(r.dnf.map(d => [d.entrant.competition_number, d.reason])).toEqual([['4', 'crash']])
   })
+  it('lists starters in the order they were scanned, for this stage and type only', () => {
+    const rep = computeReport({
+      entrants, type: 'bike', stageId: 's1', briefing: [], results: [],
+      scans: [
+        { entrant_id: 'bike-2', stage_id: 's1', point: 'start', scanned_at: '2026-10-17T09:00:05.000Z' },
+        { entrant_id: 'bike-1', stage_id: 's1', point: 'start', scanned_at: '2026-10-17T09:00:01+00:00' },
+        { entrant_id: 'bike-3', stage_id: 's0', point: 'start', scanned_at: '2026-10-17T08:00:00Z' },
+        { entrant_id: 'car-7', stage_id: 's1', point: 'start', scanned_at: '2026-10-17T09:00:00Z' },
+        { entrant_id: 'bike-1', stage_id: 's1', point: 'finish', scanned_at: '2026-10-17T09:10:00Z' },
+      ],
+    })
+    expect(rep.start.order.map(o => o.entrant.competition_number)).toEqual(['1', '2'])
+  })
   it('sorts numerically, not alphabetically', () => {
     const many = ['10', '9', '1'].map(n => mk(n, 'bike'))
     const rep = computeReport({ entrants: many, type: 'bike', stageId: 's1', ...empty })
