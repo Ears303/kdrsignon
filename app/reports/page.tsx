@@ -107,6 +107,28 @@ function Content() {
             <div className="stat"><b>{rep.dnf.length}</b><span>DNF</span></div>
           </div>
 
+          <div className="card">
+            <div className="row" style={{ justifyContent: 'space-between' }}>
+              <h2>Starters — {stage!.name}, in order scanned <span className="pill ok">{rep.start.order.length}</span></h2>
+              <button disabled={!rep.start.order.length} onClick={() => downloadText(`${type}-${stage!.name}-starters.csv`, toCsv([
+                ['Order', 'Time', 'Number', 'Name', 'Class', 'Vehicle', 'Rego'],
+                ...rep.start.order.map((o, i) => [i + 1, new Date(o.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }), o.entrant.competition_number, people(o.entrant), o.entrant.class_name, o.entrant.vehicle_description, o.entrant.registration_number]),
+              ]))}>Export CSV</button>
+            </div>
+            {rep.start.order.length === 0 ? <p className="muted">Nobody has started this stage yet.</p> : (
+              <div className="tablewrap"><table>
+                <thead><tr><th>#</th><th>Time</th><th>No.</th><th>Name</th><th>Class</th><th>Vehicle</th></tr></thead>
+                <tbody>{rep.start.order.map((o, i) => (
+                  <tr key={o.entrant.id}>
+                    <td className="muted">{i + 1}</td>
+                    <td className="muted">{new Date(o.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</td>
+                    <td className="num">{o.entrant.competition_number}</td><td>{people(o.entrant)}</td><td>{o.entrant.class_name}</td>
+                    <td>{o.entrant.vehicle_description}{o.entrant.registration_number && <span className="muted small"> · {o.entrant.registration_number}</span>}</td>
+                  </tr>))}
+                </tbody></table></div>
+            )}
+          </div>
+
           <List title="Missing — on course (started, not finished)" hint="Started this stage, no finish scan and not DNF. Chase these first."
             rows={rep.finish.onCourse} filename={`${type}-${stage!.name}-on-course.csv`}
             extra={{ head: 'Started', cell: e => { const s = data.scans.find(x => x.entrant_id === e.id && x.stage_id === stage!.id && x.point === 'start'); return s ? new Date(s.scanned_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '' } }}
