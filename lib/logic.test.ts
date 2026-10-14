@@ -7,7 +7,7 @@ import type { Entrant } from './types'
 const mk = (n: string, type: 'car' | 'bike', extra: Partial<Entrant> = {}): Entrant => ({
   id: `${type}-${n}`, event_id: 'e1', entrant_type: type, competition_number: n,
   scan_code: defaultScanCode(type, n), primary_name: `Name ${n}`, secondary_name: null,
-  class_name: null, vehicle_description: null, registration_number: null, status: 'active', ...extra,
+  class_name: null, vehicle_description: null, registration_number: null, status: 'active', status_note: null, ...extra,
 })
 const empty = { briefing: [], scans: [], results: [] }
 
@@ -88,6 +88,30 @@ describe('decideScan', () => {
     const rec = { ...empty, briefing: [{ entrant_id: 'bike-1', attended_at: 't' }] }
     expect(decideScan({ ...base, stageId: null, code: 'B1', mode: 'briefing', recorded: rec }).kind).toBe('duplicate')
     expect(decideScan({ ...base, stageId: null, code: 'B2', mode: 'briefing', recorded: rec }).kind).toBe('record')
+  })
+})
+
+describe('medical suspension', () => {
+  const entrants = [mk('1', 'bike', { status: 'medical_suspended', status_note: 'Doctor' }), mk('2', 'bike')]
+  const base = { entrants, stationType: 'bike' as const, stageId: 's1' }
+  it('hard-blocks every mode, with no override', () => {
+    for (const mode of ['briefing', 'start', 'finish', 'dnf'] as const) {
+      const d = decideScan({ ...base, code: 'B1', mode, recorded: empty })
+      expect(d).toMatchObject({ kind: 'blocked', note: 'Doctor' })
+    }
+  })
+  it('blocks even if they already have a scan (not reported as a duplicate)', () => {
+    const rec = { ...empty, scans: [{ entrant_id: 'bike-1', stage_id: 's1', point: 'start' as const, scanned_at: 't' }] }
+    expect(decideScan({ ...base, code: 'B1', mode: 'start', recorded: rec }).kind).toBe('blocked')
+  })
+  it('does not affect other entrants', () => {
+    expect(decideScan({ ...base, code: 'B2', mode: 'start', recorded: empty }).kind).toBe('record')
+  })
+  it('suspended entrants are listed separately and not counted as outstanding', () => {
+    const r = computeReport({ entrants, type: 'bike', stageId: 's1', ...empty })
+    expect(r.suspended.map(e => e.competition_number)).toEqual(['1'])
+    expect(r.start.missing.map(e => e.competition_number)).toEqual(['2'])
+    expect(r.total).toBe(1)
   })
 })
 

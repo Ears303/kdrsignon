@@ -47,14 +47,14 @@ function List({ title, hint, rows, filename, extra, action }: {
 }
 
 function Content() {
-  const { event, canManage, canRecord } = useApp()
+  const { event, canManage, canRecord, canMedical } = useApp()
   const { data, state, error, reload } = useEventData(event?.id ?? null)
   const [type, setType] = useState<EntrantType>('bike')
   const [stageId, setStageId] = useState('')
   const [msg, setMsg] = useState('')
   const [updated, setUpdated] = useState<Date | null>(null)
 
-  useEffect(() => { const t = setInterval(() => { void reload() }, 20000); return () => clearInterval(t) }, [reload])
+  useEffect(() => { const t = setInterval(() => { void reload(true) }, 20000); return () => clearInterval(t) }, [reload])
   useEffect(() => { if (state === 'ready') setUpdated(new Date()) }, [data, state])
 
   const stages = useMemo(() => data.stages.filter(s => s.enabled), [data.stages])
@@ -79,6 +79,12 @@ function Content() {
     const { data: gone, error: err } = await getSupabase().from('stage_results').delete()
       .eq('event_id', event!.id).eq('entrant_id', e.id).eq('stage_id', stage.id).select('id')
     if (err || !gone?.length) setMsg(err?.message ?? 'Could not remove (no permission?)'); else { setMsg(''); void reload() }
+  }
+
+  async function liftSuspension(e: Entrant) {
+    if (!confirm(`Lift the medical suspension for #${e.competition_number} ${e.primary_name}? They will be able to scan again.`)) return
+    const { error: err } = await getSupabase().rpc('set_medical_suspension', { p_entrant: e.id, p_suspend: false })
+    if (err) setMsg(err.message); else { setMsg(''); void reload(true) }
   }
 
   const pct = (n: number) => (rep && rep.total ? Math.round((n / rep.total) * 100) : 0)
@@ -106,6 +112,20 @@ function Content() {
             <div className="stat"><b>{rep.finish.done.length}</b><span>finished</span></div>
             <div className="stat"><b>{rep.dnf.length}</b><span>DNF</span></div>
           </div>
+
+          {rep.suspended.length > 0 && (
+            <div className="card bad">
+              <h2>Medically suspended — not permitted to scan <span className="pill bad">{rep.suspended.length}</span></h2>
+              <div className="tablewrap"><table>
+                <thead><tr><th>No.</th><th>Name</th><th>Class</th><th>Note</th>{canMedical && <th />}</tr></thead>
+                <tbody>{rep.suspended.map(e => (
+                  <tr key={e.id}>
+                    <td className="num">{e.competition_number}</td><td>{people(e)}</td><td>{e.class_name}</td><td>{e.status_note}</td>
+                    {canMedical && <td><button onClick={() => liftSuspension(e)}>Lift suspension</button></td>}
+                  </tr>))}
+                </tbody></table></div>
+            </div>
+          )}
 
           <div className="card">
             <div className="row" style={{ justifyContent: 'space-between' }}>

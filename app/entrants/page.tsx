@@ -13,6 +13,7 @@ function Content() {
   const [loading, setLoading] = useState(true)
   const [type, setType] = useState<EntrantType | 'all'>('all')
   const [q, setQ] = useState('')
+  const [statusFilter, setStatusFilter] = useState<EntrantStatus | 'all'>('all')
   const [msg, setMsg] = useState('')
 
   const load = useCallback(async () => {
@@ -27,15 +28,16 @@ function Content() {
     const s = q.trim().toLowerCase()
     return entrants
       .filter(e => (type === 'all' || e.entrant_type === type))
+      .filter(e => statusFilter === 'all' || e.status === statusFilter)
       .filter(e => !s || [e.competition_number, e.primary_name, e.secondary_name, e.class_name, e.vehicle_description, e.registration_number, e.scan_code]
         .some(v => v?.toLowerCase().includes(s)))
       .sort((a, b) => a.entrant_type.localeCompare(b.entrant_type) || byNumber(a, b))
-  }, [entrants, type, q])
+  }, [entrants, type, q, statusFilter])
 
   async function setStatus(e: Entrant, status: EntrantStatus) {
-    const { error } = await getSupabase().from('entrants').update({ status }).eq('id', e.id)
+    const { error } = await getSupabase().from('entrants').update({ status, status_note: null }).eq('id', e.id)
     if (error) setMsg(error.message)
-    else setEntrants(list => list.map(x => (x.id === e.id ? { ...x, status } : x)))
+    else setEntrants(list => list.map(x => (x.id === e.id ? { ...x, status, status_note: null } : x)))
   }
 
   async function remove(e: Entrant) {
@@ -58,6 +60,10 @@ function Content() {
             ))}
           </div>
           <input className="grow" placeholder="Search number, name, class, rego…" value={q} onChange={e => setQ(e.target.value)} />
+          <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as EntrantStatus | 'all')} style={{ width: 'auto', margin: 0 }}>
+            <option value="all">All statuses</option><option value="active">Active</option>
+            <option value="medical_suspended">Medical suspended</option><option value="withdrawn">Withdrawn</option><option value="dns">DNS</option>
+          </select>
         </div>
         <p className="muted small">{loading ? 'Loading…' : `${shown.length} of ${entrants.length}`}</p>
         {msg && <p className="bad-text">{msg}</p>}
@@ -74,11 +80,12 @@ function Content() {
                   <td>{e.vehicle_description}{e.registration_number && <div className="muted small">{e.registration_number}</div>}</td>
                   <td><code>{e.scan_code}</code></td>
                   <td>
-                    {canManage ? (
+                    {canManage && e.status !== 'medical_suspended' ? (
                       <select value={e.status} onChange={ev => setStatus(e, ev.target.value as EntrantStatus)} style={{ width: 'auto', margin: 0, padding: '4px 6px' }}>
                         <option value="active">active</option><option value="withdrawn">withdrawn</option><option value="dns">DNS</option>
                       </select>
-                    ) : <span className={`pill ${e.status === 'active' ? 'ok' : 'warn'}`}>{e.status}</span>}
+                    ) : <span className={`pill ${e.status === 'active' ? 'ok' : e.status === 'medical_suspended' ? 'bad' : 'warn'}`}>{e.status.replace('_', ' ')}</span>}
+                    {e.status === 'medical_suspended' && <div className="small bad-text"><b>SUSPENDED</b>{e.status_note ? ` — ${e.status_note}` : ''}<br />Managed by medical</div>}
                   </td>
                   {canManage && <td><button className="danger" onClick={() => remove(e)}>Delete</button></td>}
                 </tr>

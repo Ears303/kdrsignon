@@ -20,7 +20,7 @@ export function useEventData(eventId: string | null, overlay?: (d: EventData) =>
   const overlayRef = useRef(overlay)
   overlayRef.current = overlay
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (silent = false) => {
     if (!eventId) return
     const apply = (d: EventData) => setData(overlayRef.current ? overlayRef.current(d) : d)
     try {
@@ -38,6 +38,8 @@ export function useEventData(eventId: string | null, overlay?: (d: EventData) =>
       apply(d)
       setState('ready'); setError('')
     } catch (e) {
+      // a background refresh that fails keeps what's on screen; the cache could be older than that
+      if (silent) return
       let cached: EventData | null = null
       try { cached = JSON.parse(localStorage.getItem(cacheKey(eventId)) ?? 'null') } catch {}
       if (cached) { apply(cached); setState('cached') }

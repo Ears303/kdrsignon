@@ -10,6 +10,7 @@ DNFs, and live "who's missing" reports.
 | **Event** | Pick or create the event. Prologue, Lap 1–3 are created automatically; switch stages on/off. |
 | **Entrants** | Import from CSV/Excel paste, add one by hand, mark withdrawn / DNS, search. |
 | **Labels** | Print QR labels (one per entrant) containing the scan code. |
+| **Medical** | *Medical and admin logins only.* Log bike injuries and medically suspend / reinstate riders. |
 | **Scan** | The station screen. Pick **Bike/Car**, **Briefing / Start / Finish / DNF** and the **stage**, then scan with the phone camera, a Bluetooth/USB hand scanner, or type the number + Enter. |
 | **Reports** | Per type and stage: on course (started, not finished), not started, not at briefing, DNFs. Export any list to CSV. Auto-refreshes every 20 s. |
 
@@ -26,7 +27,8 @@ Scan station behaviour:
 ## Setup
 
 1. **Supabase project** → SQL Editor → run, in order:
-   `supabase/migrations/001_initial.sql` then `supabase/migrations/002_roles.sql`.
+   `supabase/migrations/001_initial.sql`, then `002_roles.sql`, then `003_medical.sql`.
+   (If a file errors with "already exists", it has already been run — skip it and run the next one.)
 2. **Authentication → Providers → Email**: turn **off** "Allow new users to sign up" (only people you add can log in).
 3. **Authentication → Users → Add user** for yourself (email + password), then in the SQL Editor make yourself admin:
    ```sql
@@ -47,8 +49,26 @@ Add other people the same way (create the user, then insert a `user_roles` row):
 | `control` | manage events/entrants/stages, record and delete any scan |
 | `scanner` | record scans, undo their own |
 | `viewer` | read-only, reports |
+| `medical` | read-only on event data and reports, plus the **Medical** page: injury log, suspend / reinstate bikes. Cannot record scans or edit entrants |
+
+Only `medical` and `admin` can see injury records or change a suspension. To give someone the medical role:
+```sql
+insert into user_roles (user_id, role)
+select id, 'medical' from auth.users where email = 'doctor@example.com'
+on conflict (user_id) do update set role = 'medical';
+```
 
 A signed-in user with no role sees nothing and is told to ask an admin.
+
+## Medical suspensions (bikes only)
+- Medical logs an injury on the **Medical** page. Ticking **Medically suspend this rider** blocks that bike at every
+  scan station (briefing, start, finish, DNF) — the scanner shows a red **MEDICALLY SUSPENDED** screen with no override.
+- The block is enforced by the database as well as the app, so a phone with out-of-date data still can't record the scan.
+  Scan stations refresh their entrant list every 30 s, so a new suspension reaches phones within about half a minute.
+- Injury details (description, outcome) are visible **only** to medical and admin. Everyone else sees just *suspended* plus a short
+  note chosen by medical (e.g. "See Control"). Keep medical details out of that note.
+- Only medical/admin can suspend or reinstate; control and scanners can't. Cars can't be suspended.
+- Suspended riders are listed on **Reports** and are not counted as missing/outstanding.
 
 ## Using it on the day
 

@@ -1,8 +1,8 @@
 export type EntrantType = 'car' | 'bike'
-export type EntrantStatus = 'active' | 'withdrawn' | 'dns'
+export type EntrantStatus = 'active' | 'withdrawn' | 'dns' | 'medical_suspended'
 export type ScanPoint = 'start' | 'finish'
 export type Method = 'camera' | 'scanner' | 'manual'
-export type Role = 'admin' | 'control' | 'scanner' | 'viewer'
+export type Role = 'admin' | 'control' | 'scanner' | 'viewer' | 'medical'
 
 export interface EventRow {
   id: string
@@ -23,9 +23,10 @@ export interface Entrant {
   vehicle_description: string | null
   registration_number: string | null
   status: EntrantStatus
+  status_note: string | null
 }
 
-export type NewEntrant = Omit<Entrant, 'id' | 'event_id' | 'status'>
+export type NewEntrant = Omit<Entrant, 'id' | 'event_id' | 'status' | 'status_note'>
 
 export interface Stage {
   id: string
@@ -61,4 +62,15 @@ export interface EventData {
   briefing: BriefingRow[]
   scans: ScanRow[]
   results: ResultRow[]
+}
+
+export interface Injury {
+  id: string
+  event_id: string
+  entrant_id: string
+  stage_id: string | null
+  occurred_at: string
+  description: string
+  outcome: string | null
+  suspended: boolean
 }

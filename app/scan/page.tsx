@@ -95,6 +95,12 @@ function Content() {
   const { data, setData, state, error, reload } = useEventData(eventId, overlay)
   const queue = useQueue(() => { void reload() })
 
+  // pick up changes made by control (e.g. a new medical suspension) without anyone having to reload
+  useEffect(() => {
+    const t = setInterval(() => { void reload(true) }, 30000)
+    return () => clearInterval(t)
+  }, [reload])
+
   const [station, setStation] = useState<Station>({ type: 'bike', mode: 'start', stageId: null })
   const [code, setCode] = useState('')
   const [reason, setReason] = useState('')
@@ -179,6 +185,12 @@ function Content() {
     switch (d.kind) {
       case 'not_found':
         setFb({ tone: 'bad', big: '?', what: 'NOT FOUND', sub: `No entrant matches “${c}”` }); signal('bad', sound); break
+      case 'blocked':
+        setFb({
+          tone: 'bad', big: `#${d.entrant.competition_number}`, what: 'MEDICALLY SUSPENDED', who: who(d.entrant),
+          sub: `DO NOT ALLOW THROUGH — refer to Control.${d.note ? ` Note: ${d.note}` : ''}`,
+        })
+        signal('bad', sound); setTimeout(() => signal('bad', sound), 500); break
       case 'wrong_type':
         setFb({ tone: 'bad', big: `#${d.entrant.competition_number}`, what: `WRONG TYPE — this is a ${d.entrant.entrant_type.toUpperCase()}`, who: who(d.entrant), sub: `This station is set to ${station.type.toUpperCase()}` }); signal('bad', sound); break
       case 'duplicate':
@@ -263,7 +275,7 @@ function Content() {
           {' · '}
           <button className="link" onClick={() => setSound(s => !s)}>{sound ? 'Sound on' : 'Sound off'}</button>
           {' · '}
-          <button className="link" onClick={() => reload()}>Refresh data</button>
+          <button className="link" onClick={() => reload(true)}>Refresh data</button>
         </p>
 
         {station.mode === 'dnf' && (

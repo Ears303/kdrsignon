@@ -14,6 +14,7 @@ interface Ctx {
   refreshEvents: () => Promise<void>
   canManage: boolean // admin or control
   canRecord: boolean // admin, control or scanner
+  canMedical: boolean // admin or medical
   signOut: () => Promise<void>
 }
 
@@ -77,6 +78,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     ready, session, role, events, event, setEventId, refreshEvents,
     canManage: role === 'admin' || role === 'control',
     canRecord: role === 'admin' || role === 'control' || role === 'scanner',
+    canMedical: role === 'admin' || role === 'medical',
     signOut: async () => { await getSupabase().auth.signOut(); setRole(null); setEvents([]) },
   }
   return <AppCtx.Provider value={value}>{children}</AppCtx.Provider>

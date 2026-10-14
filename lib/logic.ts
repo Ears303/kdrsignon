@@ -161,6 +161,7 @@ export interface Recorded {
 export type Decision =
   | { kind: 'not_found' }
   | { kind: 'wrong_type'; entrant: Entrant }
+  | { kind: 'blocked'; entrant: Entrant; note: string | null }
   | { kind: 'duplicate'; entrant: Entrant; at: string; what: string }
   | { kind: 'confirm'; entrant: Entrant; message: string }
   | { kind: 'record'; entrant: Entrant; warning?: string }
@@ -177,6 +178,8 @@ export function decideScan(args: {
   const entrant = findEntrant(entrants, code, stationType)
   if (!entrant) return { kind: 'not_found' }
   if (entrant.entrant_type !== stationType) return { kind: 'wrong_type', entrant }
+  // a medical suspension is a hard stop in every mode - checked before duplicates so it's never masked
+  if (entrant.status === 'medical_suspended') return { kind: 'blocked', entrant, note: entrant.status_note }
 
   const inactive = entrant.status !== 'active'
     ? { kind: 'confirm' as const, entrant, message: `This entrant is marked ${entrant.status === 'dns' ? 'DNS (did not start)' : 'WITHDRAWN'}.` }
@@ -219,6 +222,7 @@ export interface StageReport {
   start: { done: Entrant[]; missing: Entrant[]; order: { entrant: Entrant; at: string }[] }
   finish: { done: Entrant[]; onCourse: Entrant[] }
   dnf: { entrant: Entrant; reason: string | null; at: string }[]
+  suspended: Entrant[]
   total: number
 }
 
@@ -243,6 +247,7 @@ export function computeReport(args: {
   const byId = new Map(all.map(e => [e.id, e]))
   return {
     total: active.length,
+    suspended: all.filter(e => e.status === 'medical_suspended'),
     briefing: {
       attended: active.filter(e => briefed.has(e.id)),
       missing: active.filter(e => !briefed.has(e.id)),
