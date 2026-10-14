@@ -24,4 +24,6 @@
 .error { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; padding: 14px; border-radius: 8px; }
 .success { text-align: center; margin-top: 40px; }
 .tick { width: 70px; height: 70px; margin: 0 auto 16px; border-radius: 50%; background: #15803d; color: #fff; font-size: 40px; display: flex; align-items: center; justify-content: center; }
+.doneButtons { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; }
+.doneButtons button { width: 100%; margin-top: 0; font-size: 17px; padding: 14px; }
 button:disabled { opacity: .6; cursor: not-allowed; }
