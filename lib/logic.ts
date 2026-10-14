@@ -216,7 +216,7 @@ export function decideScan(args: {
 
 export interface StageReport {
   briefing: { attended: Entrant[]; missing: Entrant[] }
-  start: { done: Entrant[]; missing: Entrant[] }
+  start: { done: Entrant[]; missing: Entrant[]; order: { entrant: Entrant; at: string }[] }
   finish: { done: Entrant[]; onCourse: Entrant[] }
   dnf: { entrant: Entrant; reason: string | null; at: string }[]
   total: number
@@ -251,6 +251,12 @@ export function computeReport(args: {
       done: active.filter(e => started.has(e.id)),
       // someone with a finish scan obviously started; someone DNF'd is accounted for
       missing: active.filter(e => !started.has(e.id) && !finished.has(e.id) && !dnfIds.has(e.id)),
+      // everyone with a start scan for this stage, in the order they were scanned
+      order: args.scans
+        .filter(s => s.stage_id === stageId && s.point === 'start')
+        .sort((a, b) => Date.parse(a.scanned_at) - Date.parse(b.scanned_at))
+        .map(s => ({ entrant: byId.get(s.entrant_id)!, at: s.scanned_at }))
+        .filter(x => x.entrant),
     },
     finish: {
       done: active.filter(e => finished.has(e.id)),
