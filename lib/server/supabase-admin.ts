@@ -11,18 +11,17 @@ function getClient(): SupabaseClient {
 
   if (!url || !serviceKey) {
     throw new Error(
-      "Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in Vercel environment variables"
+      "Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in Vercel"
     );
   }
 
   client = createClient(url, serviceKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
-
   return client;
 }
 
-// Created only when a request comes in, not during the build
+// Only connects when a rider uses the form, never during the build
 export const supabaseAdmin = new Proxy({} as SupabaseClient, {
   get(_target, prop) {
     const c = getClient() as any;
