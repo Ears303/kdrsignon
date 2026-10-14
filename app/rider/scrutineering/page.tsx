@@ -87,6 +87,28 @@ export default function ScrutineeringPage() {
     setAnswers((a) => ({ ...a, [id]: { result: a[id]?.result, comment } }));
   }
 
+  function startAgain() {
+    setRidernetId("");
+    setCompetitionNumber("");
+    setEntrant(null);
+    setAnswers({});
+    setIsJunior(false);
+    setRiderName("");
+    setParentName("");
+    setAccepted(false);
+    setError("");
+    setDone(false);
+    window.scrollTo(0, 0);
+  }
+
+  function closeForm() {
+    window.close();
+    // Phones usually block close(), so fall back to the home page
+    setTimeout(() => {
+      window.location.href = "/";
+    }, 300);
+  }
+
   async function submit(e: FormEvent) {
     e.preventDefault();
     if (!entrant) return;
@@ -154,6 +176,15 @@ export default function ScrutineeringPage() {
             {entrant?.riderName} — #{entrant?.competitionNumber}
           </p>
           <p>Your technical self-scrutineering has been recorded.</p>
+
+          <div className={styles.doneButtons}>
+            <button type="button" className={styles.primary} onClick={startAgain}>
+              Submit another form
+            </button>
+            <button type="button" className={styles.secondary} onClick={closeForm}>
+              Close
+            </button>
+          </div>
         </section>
       </main>
     );
