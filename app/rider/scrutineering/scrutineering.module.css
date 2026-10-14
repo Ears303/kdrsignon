@@ -1,0 +1,27 @@
+.page { min-height: 100vh; background: #f3f4f6; color: #111827; padding: 20px 12px 60px; }
+.wrap { max-width: 760px; margin: 0 auto; }
+.card, .success { background: #fff; border-radius: 12px; padding: 20px; margin: 16px 0; box-shadow: 0 1px 4px rgba(0,0,0,.12); }
+.card label { display: block; font-weight: 700; margin: 14px 0 6px; }
+.card input, .card textarea { box-sizing: border-box; width: 100%; padding: 12px; font-size: 16px; border: 1px solid #cbd5e1; border-radius: 8px; }
+.card textarea { min-height: 60px; margin-top: 8px; }
+.primary, .secondary, .submit { border: 0; border-radius: 8px; padding: 12px 16px; font-weight: 800; cursor: pointer; color: #fff; margin-top: 16px; }
+.primary, .submit { background: #166534; }
+.secondary { background: #475569; }
+.submit { width: 100%; font-size: 18px; padding: 16px; }
+.item { border-top: 1px solid #e5e7eb; padding: 16px 0; scroll-margin-top: 12px; }
+.item h3, .hydration h3 { margin: 0 0 4px; font-size: 17px; }
+.item p { margin: 0; color: #4b5563; }
+.hydration { background: #e0f2fe; border: 2px solid #0284c7; border-radius: 10px; padding: 16px; margin: 12px 0; scroll-margin-top: 12px; }
+.hydration p { margin: 0; color: #075985; font-weight: 700; }
+.req { color: #dc2626; }
+.choices { display: flex; gap: 8px; margin-top: 12px; }
+.choices button { flex: 1; min-height: 44px; border: 1px solid #94a3b8; background: #fff; border-radius: 8px; font-weight: 800; cursor: pointer; }
+.choices .pass { background: #15803d; color: #fff; border-color: #15803d; }
+.choices .fail { background: #b91c1c; color: #fff; border-color: #b91c1c; }
+.choices .na { background: #4b5563; color: #fff; border-color: #4b5563; }
+.check { display: flex !important; gap: 10px; align-items: center; }
+.check input { width: auto; }
+.error { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; padding: 14px; border-radius: 8px; }
+.success { text-align: center; margin-top: 40px; }
+.tick { width: 70px; height: 70px; margin: 0 auto 16px; border-radius: 50%; background: #15803d; color: #fff; font-size: 40px; display: flex; align-items: center; justify-content: center; }
+button:disabled { opacity: .6; cursor: not-allowed; }

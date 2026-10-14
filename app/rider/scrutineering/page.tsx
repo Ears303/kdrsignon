@@ -1,0 +1,274 @@
+"use client";
+
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import styles from "./scrutineering.module.css";
+
+type Entrant = {
+  id: string;
+  eventId: string;
+  riderName: string;
+  competitionNumber: string;
+  className: string | null;
+  vehicleDescription: string | null;
+  registrationNumber: string | null;
+};
+
+type Item = {
+  id: string;
+  code: string;
+  section: string;
+  item_name: string;
+  requirement: string | null;
+  display_order: number;
+  is_required: boolean;
+};
+
+type Result = "pass" | "fail" | "na";
+type Answer = { result?: Result; comment: string };
+
+export default function ScrutineeringPage() {
+  const [ridernetId, setRidernetId] = useState("");
+  const [competitionNumber, setCompetitionNumber] = useState("");
+  const [entrant, setEntrant] = useState<Entrant | null>(null);
+  const [items, setItems] = useState<Item[]>([]);
+  const [answers, setAnswers] = useState<Record<string, Answer>>({});
+  const [isJunior, setIsJunior] = useState(false);
+  const [riderName, setRiderName] = useState("");
+  const [parentName, setParentName] = useState("");
+  const [accepted, setAccepted] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [done, setDone] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/rider/scrutineering/checklist")
+      .then((r) => r.json())
+      .then((j) => {
+        if (j.error) setError(j.error);
+        setItems(j.checklist ?? []);
+      })
+      .catch(() => setError("Checklist could not be loaded."));
+  }, []);
+
+  const sections = useMemo(
+    () => Array.from(new Set(items.map((i) => i.section))),
+    [items]
+  );
+
+  async function lookup(e: FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      const r = await fetch("/api/rider/lookup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ridernetId, competitionNumber }),
+      });
+      const j = await r.json();
+      if (!r.ok) {
+        setError(j.error);
+        return;
+      }
+      setEntrant(j.entrant);
+      setRiderName(j.entrant.riderName ?? "");
+    } catch {
+      setError("Unable to check the entry.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function setResult(id: string, result: Result) {
+    setAnswers((a) => ({ ...a, [id]: { result, comment: a[id]?.comment ?? "" } }));
+  }
+
+  function setComment(id: string, comment: string) {
+    setAnswers((a) => ({ ...a, [id]: { result: a[id]?.result, comment } }));
+  }
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    if (!entrant) return;
+
+    const missing = items.find((i) => i.is_required && !answers[i.id]?.result);
+    if (missing) {
+      setError(`Please complete: ${missing.item_name}`);
+      document.getElementById(missing.id)?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+
+    const hydration = items.find((i) => i.code === "HYDRATION");
+    if (hydration && answers[hydration.id]?.result !== "pass") {
+      setError("You must have a 2 litre water container or CamelBak-type system to ride.");
+      document.getElementById(hydration.id)?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+
+    if (!accepted) return setError("Please accept the declaration.");
+    if (!riderName.trim()) return setError("Please enter the rider printed name.");
+    if (isJunior && !parentName.trim()) return setError("Please enter the parent or guardian name.");
+
+    setBusy(true);
+    setError("");
+    try {
+      const r = await fetch("/api/rider/scrutineering/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ridernetId,
+          competitionNumber,
+          entrantId: entrant.id,
+          isJunior,
+          declarationAccepted: accepted,
+          riderPrintedName: riderName,
+          parentGuardianPrintedName: parentName,
+          answers: items.map((i) => ({
+            checklistId: i.id,
+            result: answers[i.id]?.result,
+            comment: answers[i.id]?.comment ?? "",
+          })),
+        }),
+      });
+      const j = await r.json();
+      if (!r.ok) {
+        setError(j.error);
+        return;
+      }
+      setDone(true);
+      window.scrollTo(0, 0);
+    } catch {
+      setError("Submission failed. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (done) {
+    return (
+      <main className={styles.page}>
+        <section className={styles.success}>
+          <div className={styles.tick}>✓</div>
+          <h1>Submission received</h1>
+          <p>
+            {entrant?.riderName} — #{entrant?.competitionNumber}
+          </p>
+          <p>Your technical self-scrutineering has been recorded.</p>
+        </section>
+      </main>
+    );
+  }
+
+  return (
+    <main className={styles.page}>
+      <div className={styles.wrap}>
+        <h1>Technical Self-Scrutineering</h1>
+        <p>Complete one form for each machine.</p>
+
+        {error && <div className={styles.error}>{error}</div>}
+
+        {!entrant ? (
+          <form className={styles.card} onSubmit={lookup}>
+            <h2>Find your entry</h2>
+            <label>RideNet ID</label>
+            <input required value={ridernetId} onChange={(e) => setRidernetId(e.target.value)} />
+            <label>Competition number</label>
+            <input
+              required
+              inputMode="numeric"
+              value={competitionNumber}
+              onChange={(e) => setCompetitionNumber(e.target.value)}
+            />
+            <button className={styles.primary} disabled={busy}>
+              {busy ? "Checking..." : "Find my entry"}
+            </button>
+          </form>
+        ) : (
+          <form onSubmit={submit}>
+            <section className={styles.card}>
+              <h2>Entry confirmed</h2>
+              <p><b>Rider:</b> {entrant.riderName}</p>
+              <p><b>Competition #:</b> {entrant.competitionNumber}</p>
+              <p><b>Class:</b> {entrant.className || "—"}</p>
+              <p><b>Machine:</b> {entrant.vehicleDescription || "—"}</p>
+              {entrant.registrationNumber && (
+                <p><b>Registration:</b> {entrant.registrationNumber}</p>
+              )}
+              <button type="button" className={styles.secondary} onClick={() => setEntrant(null)}>
+                Not me — go back
+              </button>
+            </section>
+
+            {sections.map((section) => (
+              <section className={styles.card} key={section}>
+                <h2>{section}</h2>
+                {items
+                  .filter((i) => i.section === section)
+                  .map((i) => (
+                    <div
+                      id={i.id}
+                      key={i.id}
+                      className={i.code === "HYDRATION" ? styles.hydration : styles.item}
+                    >
+                      <h3>
+                        {i.item_name}
+                        {i.is_required && <span className={styles.req}> *</span>}
+                      </h3>
+                      {i.requirement && <p>{i.requirement}</p>}
+                      <div className={styles.choices}>
+                        {(["pass", "fail", "na"] as const).map((v) => (
+                          <button
+                            type="button"
+                            key={v}
+                            className={answers[i.id]?.result === v ? styles[v] : ""}
+                            onClick={() => setResult(i.id, v)}
+                          >
+                            {v === "na" ? "N/A" : v.toUpperCase()}
+                          </button>
+                        ))}
+                      </div>
+                      <textarea
+                        placeholder="Comment if required"
+                        value={answers[i.id]?.comment ?? ""}
+                        onChange={(e) => setComment(i.id, e.target.value)}
+                      />
+                    </div>
+                  ))}
+              </section>
+            ))}
+
+            <section className={styles.card}>
+              <h2>Declaration</h2>
+              <p>
+                I acknowledge the importance of my protective clothing, equipment and machine
+                being in good condition and fit for the purpose of taking part in this event, and
+                that I alone am responsible for them being and remaining fit for purpose
+                throughout the event.
+              </p>
+              <label className={styles.check}>
+                <input type="checkbox" checked={accepted} onChange={(e) => setAccepted(e.target.checked)} />
+                I accept the declaration *
+              </label>
+              <label>Rider printed name *</label>
+              <input value={riderName} onChange={(e) => setRiderName(e.target.value)} />
+              <label className={styles.check}>
+                <input type="checkbox" checked={isJunior} onChange={(e) => setIsJunior(e.target.checked)} />
+                Junior rider
+              </label>
+              {isJunior && (
+                <>
+                  <label>Parent / guardian printed name *</label>
+                  <input value={parentName} onChange={(e) => setParentName(e.target.value)} />
+                </>
+              )}
+            </section>
+
+            <button className={styles.submit} disabled={busy}>
+              {busy ? "Submitting..." : "Submit self-scrutineering"}
+            </button>
+          </form>
+        )}
+      </div>
+    </main>
+  );
+}
