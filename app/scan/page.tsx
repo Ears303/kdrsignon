@@ -44,7 +44,7 @@ function overlayPending(eventId: string) {
     const out = { ...d, briefing: [...d.briefing], scans: [...d.scans], results: [...d.results] }
     for (const i of items) {
       const r = i.row as Record<string, string>
-      if (i.table === 'briefing_attendance') out.briefing.push({ entrant_id: r.entrant_id, attended_at: r.attended_at })
+      if (i.table === 'briefing_attendance') out.briefing.push({ entrant_id: r.entrant_id, stage_id: r.stage_id, attended_at: r.attended_at })
       else if (i.table === 'stage_scans') out.scans.push({ entrant_id: r.entrant_id, stage_id: r.stage_id, point: r.point as 'start' | 'finish', scanned_at: r.scanned_at })
       else out.results.push({ entrant_id: r.entrant_id, stage_id: r.stage_id, status: 'dnf', reason: r.reason ?? null, recorded_at: r.recorded_at })
     }
@@ -128,14 +128,15 @@ function Content() {
 
   const stages = useMemo(() => data.stages.filter(s => s.enabled).sort((a, b) => a.sequence_number - b.sequence_number), [data.stages])
   const stage = stages.find(s => s.id === station.stageId) ?? stages[0] ?? null
-  const needsStage = station.mode !== 'briefing'
+  // every mode (briefing, start, finish, DNF) now belongs to a specific stage: Prologue, Lap 1, Lap 2, Lap 3
+  const needsStage = true
 
   // ---- progress counter for the current station
   const progress = useMemo(() => {
     const ofType = data.entrants.filter(e => e.entrant_type === station.type && e.status === 'active')
     const ids = new Set(ofType.map(e => e.id))
     let done = 0
-    if (station.mode === 'briefing') done = data.briefing.filter(b => ids.has(b.entrant_id)).length
+    if (stage && station.mode === 'briefing') done = data.briefing.filter(b => b.stage_id === stage.id && ids.has(b.entrant_id)).length
     else if (stage && station.mode === 'dnf') done = data.results.filter(r => r.stage_id === stage.id && r.status === 'dnf' && ids.has(r.entrant_id)).length
     else if (stage) done = data.scans.filter(s => s.stage_id === stage.id && s.point === station.mode && ids.has(s.entrant_id)).length
     return { done, total: ofType.length }
@@ -152,9 +153,9 @@ function Content() {
     let table: QueueTable, row: Record<string, unknown> & { event_id: string }, label: string
     if (mode === 'briefing') {
       table = 'briefing_attendance'
-      row = { event_id: eventId, entrant_id: entrant.id, attended_at: now, method }
-      label = 'Briefing'
-      setData(d => ({ ...d, briefing: [...d.briefing, { entrant_id: entrant.id, attended_at: now }] }))
+      row = { event_id: eventId, entrant_id: entrant.id, stage_id: stage!.id, attended_at: now, method }
+      label = `Briefing · ${stage!.name}`
+      setData(d => ({ ...d, briefing: [...d.briefing, { entrant_id: entrant.id, stage_id: stage!.id, attended_at: now }] }))
     } else if (mode === 'dnf') {
       table = 'stage_results'
       row = { event_id: eventId, entrant_id: entrant.id, stage_id: stage!.id, status: 'dnf', reason: reason.trim() || null, recorded_at: now }
@@ -266,7 +267,7 @@ function Content() {
     }
     setData(d => ({
       ...d,
-      briefing: r.table === 'briefing_attendance' ? d.briefing.filter(b => b.entrant_id !== r.entrant.id) : d.briefing,
+      briefing: r.table === 'briefing_attendance' ? d.briefing.filter(b => !(b.entrant_id === r.entrant.id && b.stage_id === r.stageId)) : d.briefing,
       scans: r.table === 'stage_scans' ? d.scans.filter(s => !(s.entrant_id === r.entrant.id && s.stage_id === r.stageId && s.point === r.point)) : d.scans,
       results: r.table === 'stage_results' ? d.results.filter(x => !(x.entrant_id === r.entrant.id && x.stage_id === r.stageId)) : d.results,
     }))
