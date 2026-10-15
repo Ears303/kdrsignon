@@ -3,6 +3,39 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import styles from "./scrutineering.module.css";
 
+// ------------------------------------------------------------------
+// LANDING PAGE TEXT - edit the wording here.
+// ------------------------------------------------------------------
+const INTRO_TITLE = "Technical Self-Scrutineering";
+
+const INTRO_TEXT =
+  "All items below are to be completed prior to the closing date for this form to be accepted. Missing or incomplete items will see your machine needing to be presented to the Scrutineer for inspection.";
+
+const NOTES_TITLE = "NOTE:";
+
+const NOTES: string[] = [
+  "Random scrutineering will be conducted on machines and rider safety gear across all classes throughout the event.",
+  "Incomplete forms will not be accepted. Please check your email for notification of any errors.",
+  "One scrutineering sheet must be completed per machine.",
+  "For juniors, both the rider and parent or guardian must sign this form for it to be considered complete.",
+  "Please ensure you provide your correct MA Competition Licence Number, now known as your RidernetID. This is a 6 digit number.",
+];
+
+// Links shown under the notes
+const MA_RULES_URL = "https://www.ma.org.au/licences-rules/rules/";
+const MOMS_URL =
+  "https://drive.google.com/file/d/1Gz-T_HGwlGmNXAv9k3MtjVjAAoAi599i/view?usp=sharing";
+
+const BEFORE_YOU_START_TITLE = "Before you start, have ready:";
+
+const BEFORE_YOU_START: string[] = [
+  "Your RidernetID (6 digits)",
+  "Your competition number",
+  "Your machine's VIN",
+  "A 2 litre water container or CamelBak-type hydration system",
+  "Body armour which complies",
+];
+
 type Entrant = {
   id: string;
   eventId: string;
@@ -211,7 +244,74 @@ export default function ScrutineeringPage() {
     <main className={styles.page}>
       <div className={styles.wrap}>
         <h1>Technical Self-Scrutineering</h1>
-        <p>Complete one form for each machine.</p>
+
+        {!entrant && (
+          <section
+            style={{
+              background: "#eff6ff",
+              border: "1px solid #bfdbfe",
+              borderRadius: "12px",
+              padding: "18px 20px",
+              margin: "16px 0",
+              color: "#1e3a8a",
+              lineHeight: 1.5,
+            }}
+          >
+            <h2 style={{ margin: "0 0 10px", fontSize: "19px" }}>{INTRO_TITLE}</h2>
+
+            <p style={{ margin: "8px 0" }}>{INTRO_TEXT}</p>
+
+            <p style={{ margin: "14px 0 6px", fontWeight: 700 }}>{NOTES_TITLE}</p>
+            <ol style={{ margin: 0, paddingLeft: "22px" }}>
+              {NOTES.map((line, i) => (
+                <li key={i} style={{ margin: "6px 0" }}>
+                  {line}
+                </li>
+              ))}
+            </ol>
+
+            <p style={{ margin: "14px 0 4px" }}>
+              Motorcycling Australia Rules can be reviewed at the link below:
+            </p>
+            <p style={{ margin: "0 0 10px", wordBreak: "break-all" }}>
+              <a
+                href={MA_RULES_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: "#1d4ed8", fontWeight: 700, textDecoration: "underline" }}
+              >
+                {MA_RULES_URL}
+              </a>
+            </p>
+
+            <p style={{ margin: "10px 0" }}>
+              Manual of Motorcycle Sport (MOMS):{" "}
+              <a
+                href={MOMS_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: "#1d4ed8", fontWeight: 700, textDecoration: "underline" }}
+              >
+                Open the MOMS
+              </a>
+            </p>
+
+            {BEFORE_YOU_START.length > 0 && (
+              <>
+                <p style={{ margin: "14px 0 6px", fontWeight: 700 }}>{BEFORE_YOU_START_TITLE}</p>
+                <ul style={{ margin: 0, paddingLeft: "22px" }}>
+                  {BEFORE_YOU_START.map((line, i) => (
+                    <li key={i} style={{ margin: "4px 0" }}>
+                      {line}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </section>
+        )}
+
+        {entrant && <p>Complete one form for each machine.</p>}
 
         {error && <div className={styles.error}>{error}</div>}
 
