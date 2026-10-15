@@ -12,6 +12,7 @@ const NAV = [
   { href: '/entrants', label: 'Entrants' },
   { href: '/labels', label: 'Labels' },
   { href: '/medical', label: 'Medical', medical: true },
+  { href: '/tech-inspection', label: 'Tech Inspection' },
 ]
 
 export function Shell({ children, needEvent = false }: { children: React.ReactNode; needEvent?: boolean }) {
@@ -36,7 +37,7 @@ export function Shell({ children, needEvent = false }: { children: React.ReactNo
       <header className="top">
         <nav>
           {NAV.filter(n => !('medical' in n) || app.canMedical).map(n => (
-            <Link key={n.href} href={n.href} className={path === n.href ? 'active' : ''}>{n.label}</Link>
+            {n.href}{n.label}</Link>
           ))}
         </nav>
         <div className="who">
