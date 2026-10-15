@@ -169,6 +169,7 @@ export default function TechInspectionPage() {
               <p>Class: <b>{detail.class_name || '—'}</b></p>
               <p>Machine: <b>{detail.vehicle_description || '—'}</b></p>
               {detail.registration_number && <p>Registration: <b>{detail.registration_number}</b></p>}
+              <p>VIN: <b>{detail.vin || '—'}</b></p>
               <p>Submitted: <b>{fmt(detail.submitted_at)}</b></p>
               <p>Rider signed: <b>{detail.rider_printed_name}</b> ({fmt(detail.rider_signed_at)})</p>
               {detail.is_junior && (

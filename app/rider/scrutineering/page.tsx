@@ -26,12 +26,19 @@ type Item = {
 type Result = "pass" | "fail" | "na";
 type Answer = { result?: Result; comment: string };
 
+// Items that are highlighted and must be PASS to submit
+const MUST_PASS: Record<string, string> = {
+  HYDRATION: "You must have a 2 litre water container or CamelBak-type system to ride.",
+  BODY_ARMOUR: "You must have body armour which complies to ride.",
+};
+
 export default function ScrutineeringPage() {
   const [ridernetId, setRidernetId] = useState("");
   const [competitionNumber, setCompetitionNumber] = useState("");
   const [entrant, setEntrant] = useState<Entrant | null>(null);
   const [items, setItems] = useState<Item[]>([]);
   const [answers, setAnswers] = useState<Record<string, Answer>>({});
+  const [vin, setVin] = useState("");
   const [isJunior, setIsJunior] = useState(false);
   const [riderName, setRiderName] = useState("");
   const [parentName, setParentName] = useState("");
@@ -92,6 +99,7 @@ export default function ScrutineeringPage() {
     setCompetitionNumber("");
     setEntrant(null);
     setAnswers({});
+    setVin("");
     setIsJunior(false);
     setRiderName("");
     setParentName("");
@@ -113,6 +121,12 @@ export default function ScrutineeringPage() {
     e.preventDefault();
     if (!entrant) return;
 
+    if (!vin.trim()) {
+      setError("Please enter the VIN.");
+      document.getElementById("vin-box")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+
     const missing = items.find((i) => i.is_required && !answers[i.id]?.result);
     if (missing) {
       setError(`Please complete: ${missing.item_name}`);
@@ -120,11 +134,13 @@ export default function ScrutineeringPage() {
       return;
     }
 
-    const hydration = items.find((i) => i.code === "HYDRATION");
-    if (hydration && answers[hydration.id]?.result !== "pass") {
-      setError("You must have a 2 litre water container or CamelBak-type system to ride.");
-      document.getElementById(hydration.id)?.scrollIntoView({ behavior: "smooth", block: "center" });
-      return;
+    for (const item of items) {
+      const message = MUST_PASS[item.code];
+      if (message && answers[item.id]?.result !== "pass") {
+        setError(message);
+        document.getElementById(item.id)?.scrollIntoView({ behavior: "smooth", block: "center" });
+        return;
+      }
     }
 
     if (!accepted) return setError("Please accept the declaration.");
@@ -141,6 +157,7 @@ export default function ScrutineeringPage() {
           ridernetId,
           competitionNumber,
           entrantId: entrant.id,
+          vin: vin.trim(),
           isJunior,
           declarationAccepted: accepted,
           riderPrintedName: riderName,
@@ -230,6 +247,20 @@ export default function ScrutineeringPage() {
               </button>
             </section>
 
+            <section className={styles.card} id="vin-box">
+              <h2>Machine VIN</h2>
+              <label>
+                VIN <span className={styles.req}>*</span>
+              </label>
+              <input
+                value={vin}
+                onChange={(e) => setVin(e.target.value.toUpperCase())}
+                autoCapitalize="characters"
+                autoComplete="off"
+                maxLength={40}
+              />
+            </section>
+
             {sections.map((section) => (
               <section className={styles.card} key={section}>
                 <h2>{section}</h2>
@@ -239,7 +270,7 @@ export default function ScrutineeringPage() {
                     <div
                       id={i.id}
                       key={i.id}
-                      className={i.code === "HYDRATION" ? styles.hydration : styles.item}
+                      className={MUST_PASS[i.code] ? styles.hydration : styles.item}
                     >
                       <h3>
                         {i.item_name}

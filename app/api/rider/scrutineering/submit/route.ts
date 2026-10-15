@@ -2,12 +2,19 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/server/supabase-admin";
 import { ENTRANT_COLUMNS } from "@/lib/server/entrant-map";
 
+// Items the rider must answer PASS on before the form can be submitted
+const MUST_PASS: Record<string, string> = {
+  HYDRATION: "The 2 litre water / CamelBak requirement must be PASS to submit.",
+  BODY_ARMOUR: "You must have body armour which complies. It must be PASS to submit.",
+};
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const ridernetId = String(body.ridernetId ?? "").trim();
     const competitionNumber = String(body.competitionNumber ?? "").trim();
     const entrantId = String(body.entrantId ?? "");
+    const vin = String(body.vin ?? "").trim().toUpperCase();
     const riderPrintedName = String(body.riderPrintedName ?? "").trim();
     const parentName = String(body.parentGuardianPrintedName ?? "").trim();
     const isJunior = Boolean(body.isJunior);
@@ -16,6 +23,12 @@ export async function POST(request: Request) {
 
     if (!ridernetId || !competitionNumber || !entrantId || !riderPrintedName || !declarationAccepted) {
       return NextResponse.json({ error: "Required submission details are missing." }, { status: 400 });
+    }
+    if (!vin) {
+      return NextResponse.json({ error: "Please enter the VIN." }, { status: 400 });
+    }
+    if (vin.length > 40) {
+      return NextResponse.json({ error: "The VIN is too long." }, { status: 400 });
     }
     if (isJunior && !parentName) {
       return NextResponse.json({ error: "Parent or guardian name is required." }, { status: 400 });
@@ -52,12 +65,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Complete every required checklist item." }, { status: 400 });
     }
 
-    const hydration = (required ?? []).find((item) => item.code === "HYDRATION");
-    if (hydration && answerMap.get(hydration.id) !== "pass") {
-      return NextResponse.json(
-        { error: "The 2 litre water / CamelBak requirement must be PASS to submit." },
-        { status: 400 }
-      );
+    for (const item of required ?? []) {
+      const message = MUST_PASS[item.code];
+      if (message && answerMap.get(item.id) !== "pass") {
+        return NextResponse.json({ error: message }, { status: 400 });
+      }
     }
 
     const now = new Date().toISOString();
@@ -72,6 +84,7 @@ export async function POST(request: Request) {
         competition_number: String(entrant.competition_number),
         vehicle_description: entrant.vehicle_description,
         registration_number: entrant.registration_number,
+        vin,
         is_junior: isJunior,
         declaration_accepted: true,
         rider_printed_name: riderPrintedName,
