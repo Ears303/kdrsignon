@@ -37,7 +37,7 @@ export function Shell({ children, needEvent = false }: { children: React.ReactNo
       <header className="top">
         <nav>
           {NAV.filter(n => !('medical' in n) || app.canMedical).map(n => (
-            {n.href}{n.label}</Link>
+            <Link key={n.href} href={n.href} className={path === n.href ? 'active' : ''}>{n.label}</Link>
           ))}
         </nav>
         <div className="who">
