@@ -28,7 +28,7 @@ export function useEventData(eventId: string | null, overlay?: (d: EventData) =>
       const [entrants, stagesRes, briefing, scans, results] = await Promise.all([
         fetchAll<Entrant>('entrants', eventId),
         sb.from('stages').select('*').eq('event_id', eventId).order('sequence_number'),
-        fetchAll<BriefingRow>('briefing_attendance', eventId, 'entrant_id,attended_at'),
+        fetchAll<BriefingRow>('briefing_attendance', eventId, 'entrant_id,stage_id,attended_at'),
         fetchAll<ScanRow>('stage_scans', eventId, 'entrant_id,stage_id,point,scanned_at'),
         fetchAll<ResultRow>('stage_results', eventId, 'entrant_id,stage_id,status,reason,recorded_at'),
       ])

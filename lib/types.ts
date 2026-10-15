@@ -38,6 +38,8 @@ export interface Stage {
 
 export interface BriefingRow {
   entrant_id: string
+  // which stage's briefing this is (Prologue, Lap 1, ...). null = an older, event-wide briefing record
+  stage_id: string | null
   attended_at: string
 }
 

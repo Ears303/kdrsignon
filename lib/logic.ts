@@ -185,13 +185,15 @@ export function decideScan(args: {
     ? { kind: 'confirm' as const, entrant, message: `This entrant is marked ${entrant.status === 'dns' ? 'DNS (did not start)' : 'WITHDRAWN'}.` }
     : null
 
+  // every mode, briefing included, belongs to a specific stage (Prologue, Lap 1, Lap 2, Lap 3)
+  if (!stageId) return { kind: 'not_found' }
+
   if (mode === 'briefing') {
-    const b = recorded.briefing.find(x => x.entrant_id === entrant.id)
+    const b = recorded.briefing.find(x => x.entrant_id === entrant.id && x.stage_id === stageId)
     if (b) return { kind: 'duplicate', entrant, at: b.attended_at, what: 'Briefing already recorded' }
     return inactive ?? { kind: 'record', entrant }
   }
 
-  if (!stageId) return { kind: 'not_found' }
   const dnf = recorded.results.find(r => r.entrant_id === entrant.id && r.stage_id === stageId && r.status === 'dnf')
   const stageScan = (point: ScanPoint) =>
     recorded.scans.find(s => s.entrant_id === entrant.id && s.stage_id === stageId && s.point === point)
@@ -238,7 +240,8 @@ export function computeReport(args: {
   const all = args.entrants.filter(e => e.entrant_type === type).sort(byNumber)
   const active = all.filter(e => e.status === 'active')
 
-  const briefed = new Set(args.briefing.map(b => b.entrant_id))
+  // briefing is per stage: only this stage's briefing sign-ins count
+  const briefed = new Set(args.briefing.filter(b => b.stage_id === stageId).map(b => b.entrant_id))
   const started = new Set(args.scans.filter(s => s.stage_id === stageId && s.point === 'start').map(s => s.entrant_id))
   const finished = new Set(args.scans.filter(s => s.stage_id === stageId && s.point === 'finish').map(s => s.entrant_id))
   const dnfRows = args.results.filter(r => r.stage_id === stageId && r.status === 'dnf')
