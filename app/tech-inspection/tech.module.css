@@ -1,0 +1,32 @@
+.head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.back { background: none; border: 0; color: #1d4ed8; font-weight: 700; cursor: pointer; padding: 0; margin-bottom: 10px; font-size: 15px; }
+.refresh { border: 1px solid #cbd5e1; background: #fff; border-radius: 8px; padding: 8px 12px; font-weight: 700; cursor: pointer; }
+.tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; }
+.tab, .tabOn { border: 1px solid #94a3b8; background: #fff; border-radius: 999px; padding: 7px 12px; font-weight: 700; cursor: pointer; font-size: 14px; }
+.tabOn { background: #111827; color: #fff; border-color: #111827; }
+.search { box-sizing: border-box; width: 100%; padding: 10px 12px; font-size: 16px; border: 1px solid #cbd5e1; border-radius: 8px; }
+.rowCard { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 12px; text-align: left; background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 14px 16px; margin-bottom: 8px; cursor: pointer; font: inherit; color: inherit; }
+.rowCard:hover { background: #f9fafb; }
+.rowTitle { font-weight: 800; font-size: 16px; }
+.rowSub { color: #4b5563; font-size: 14px; margin-top: 3px; }
+.junior { background: #fed7aa; color: #9a3412; font-size: 11px; font-weight: 800; border-radius: 4px; padding: 2px 6px; margin-left: 8px; }
+.badge { white-space: nowrap; border-radius: 999px; padding: 5px 10px; font-size: 13px; font-weight: 800; }
+.submitted { background: #dbeafe; color: #1e40af; }
+.requires_review { background: #fef3c7; color: #92400e; }
+.accepted { background: #dcfce7; color: #166534; }
+.rejected { background: #fee2e2; color: #991b1b; }
+.checkRow { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 10px 0; border-top: 1px solid #e5e7eb; }
+.failRow { background: #fef2f2; margin: 0 -10px; padding: 10px; border-radius: 6px; }
+.checkName { font-weight: 700; }
+.comment { color: #374151; font-size: 14px; margin-top: 3px; }
+.result { font-weight: 800; font-size: 13px; border-radius: 6px; padding: 4px 8px; white-space: nowrap; }
+.r_pass { background: #dcfce7; color: #166534; }
+.r_fail { background: #b91c1c; color: #fff; }
+.r_na { background: #e5e7eb; color: #374151; }
+.notes { box-sizing: border-box; width: 100%; min-height: 80px; padding: 10px; font-size: 16px; border: 1px solid #cbd5e1; border-radius: 8px; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.actions button { flex: 1 1 130px; border: 0; border-radius: 8px; padding: 13px; font-size: 16px; font-weight: 800; color: #fff; cursor: pointer; }
+.accept { background: #15803d; }
+.review { background: #d97706; }
+.reject { background: #b91c1c; }
+button:disabled { opacity: .6; cursor: not-allowed; }
