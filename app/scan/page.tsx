@@ -4,6 +4,7 @@ import { Shell } from '@/components/Shell'
 import { useApp } from '@/components/AppProvider'
 import { getSupabase } from '@/lib/supabase'
 import { decideScan, type Mode } from '@/lib/logic'
+import { findByLicence, findEntrants } from '@/lib/lookup'
 import { signal } from '@/lib/feedback'
 import { readQueue, useQueue, type QueueTable } from '@/lib/useQueue'
 import { useEventData } from '@/lib/useEventData'
@@ -34,6 +35,8 @@ const MODES: { id: Mode; label: string }[] = [
   { id: 'briefing', label: 'Briefing' }, { id: 'start', label: 'Start' }, { id: 'finish', label: 'Finish' }, { id: 'dnf', label: 'DNF' },
 ]
 const time = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+const who = (e: Entrant) => [e.primary_name, e.secondary_name].filter(Boolean).join(' / ')
+const licenceOf = (e: Entrant) => (e as Entrant & { ridernet_id?: string | null }).ridernet_id ?? ''
 
 function overlayPending(eventId: string) {
   return (d: EventData): EventData => {
@@ -105,6 +108,7 @@ function Content() {
   const [code, setCode] = useState('')
   const [reason, setReason] = useState('')
   const [fb, setFb] = useState<Feedback | null>(null)
+  const [choices, setChoices] = useState<{ list: Entrant[]; method: Method } | null>(null)
   const [recent, setRecent] = useState<Recent[]>([])
   const [camera, setCamera] = useState(false)
   const [sound, setSound] = useState(true)
@@ -167,24 +171,21 @@ function Content() {
     const verb = mode === 'briefing' ? 'BRIEFING OK' : mode === 'dnf' ? 'DNF RECORDED' : mode === 'start' ? 'START RECORDED' : 'FINISH RECORDED'
     setFb({
       tone: warning ? 'warn' : 'ok', big: `#${entrant.competition_number}`, what: verb,
-      who: [entrant.primary_name, entrant.secondary_name].filter(Boolean).join(' / '),
+      who: who(entrant),
       sub: warning ?? [entrant.class_name, entrant.vehicle_description].filter(Boolean).join(' · '),
     })
     signal(warning ? 'warn' : 'ok', sound)
   }, [eventId, station.mode, stage, reason, queue, setData, sound])
 
-  const submit = useCallback((raw: string, method: Method) => {
-    const c = raw.trim()
-    if (!c) return
-    if (needsStage && !stage) { setFb({ tone: 'bad', big: '!', what: 'NO STAGE SELECTED' }); signal('bad', sound); return }
+  // ---- run the existing checks (suspension, wrong type, duplicate, etc.)
+  const handle = useCallback((entrants: Entrant[], c: string, method: Method, shown: string) => {
     const d = decideScan({
-      entrants: data.entrants, code: c, stationType: station.type, mode: station.mode, stageId: stage?.id ?? null,
+      entrants, code: c, stationType: station.type, mode: station.mode, stageId: stage?.id ?? null,
       recorded: { briefing: data.briefing, scans: data.scans, results: data.results },
     })
-    const who = (e: Entrant) => [e.primary_name, e.secondary_name].filter(Boolean).join(' / ')
     switch (d.kind) {
       case 'not_found':
-        setFb({ tone: 'bad', big: '?', what: 'NOT FOUND', sub: `No entrant matches “${c}”` }); signal('bad', sound); break
+        setFb({ tone: 'bad', big: '?', what: 'NOT FOUND', sub: `No entrant matches “${shown}”` }); signal('bad', sound); break
       case 'blocked':
         setFb({
           tone: 'bad', big: `#${d.entrant.competition_number}`, what: 'MEDICALLY SUSPENDED', who: who(d.entrant),
@@ -200,7 +201,40 @@ function Content() {
       case 'record':
         commit(d.entrant, method, d.warning)
     }
-  }, [needsStage, stage, data, station.type, station.mode, commit, sound])
+  }, [stage, data, station.type, station.mode, commit, sound])
+
+  // one known entrant: pass only that entrant through the existing checks
+  const runFor = useCallback((e: Entrant, method: Method, shown: string) => {
+    setChoices(null)
+    handle([e], String(e.competition_number), method, shown)
+  }, [handle])
+
+  const submit = useCallback((raw: string, method: Method) => {
+    const c = raw.trim()
+    if (!c) return
+    setChoices(null)
+    if (needsStage && !stage) { setFb({ tone: 'bad', big: '!', what: 'NO STAGE SELECTED' }); signal('bad', sound); return }
+
+    // Briefing: licence (RidernetID) first. Everywhere: number, RidernetID, scan code or name.
+    let matches: Entrant[] = station.mode === 'briefing' ? findByLicence(data.entrants, c) : []
+    if (!matches.length) matches = findEntrants(data.entrants, c).map(h => h.entrant)
+
+    // same number in bike and car: keep the one for this station
+    if (matches.length > 1) {
+      const ofType = matches.filter(e => e.entrant_type === station.type)
+      if (ofType.length === 1) matches = ofType
+    }
+
+    if (matches.length === 1) { runFor(matches[0], method, c); return }
+    if (matches.length > 1) {
+      setChoices({ list: matches.slice(0, 10), method })
+      setFb({ tone: 'warn', big: String(matches.length), what: 'MORE THAN ONE MATCH', sub: 'Pick the right entrant below' })
+      signal('warn', sound)
+      return
+    }
+    // nothing found by the lookup: fall back to the original matching
+    handle(data.entrants, c, method, c)
+  }, [needsStage, stage, data.entrants, station.type, station.mode, runFor, handle, sound])
 
   const submitRef = useRef(submit); submitRef.current = submit
   const onCamera = useCallback((text: string) => submitRef.current(text, 'camera'), [])
@@ -241,6 +275,9 @@ function Content() {
   }
 
   const heading = `${station.type.toUpperCase()} · ${needsStage ? (stage?.name ?? '—').toUpperCase() + ' · ' : ''}${station.mode.toUpperCase()}`
+  const placeholder = station.mode === 'briefing'
+    ? 'Scan licence, or type RidernetID / number / name + Enter'
+    : 'Scan, or type number / RidernetID / name + Enter'
 
   return (
     <>
@@ -285,7 +322,7 @@ function Content() {
         <input
           ref={inputRef} className="scanin" value={code} onChange={e => setCode(e.target.value)} onKeyDown={onKey}
           onBlur={() => setTimeout(focusInput, 150)}
-          placeholder="Scan, or type number + Enter" autoComplete="off" autoCapitalize="characters" autoCorrect="off" spellCheck={false}
+          placeholder={placeholder} autoComplete="off" autoCapitalize="characters" autoCorrect="off" spellCheck={false}
           disabled={state === 'loading'}
         />
         <div className="row" style={{ marginTop: 8 }}>
@@ -307,6 +344,28 @@ function Content() {
               <button onClick={() => setFb(null)}>Cancel</button>
             </div>
           )}
+        </div>
+      )}
+
+      {choices && (
+        <div className="card">
+          <h2>Which entrant?</h2>
+          <div className="tablewrap">
+            <table>
+              <tbody>
+                {choices.list.map(e => (
+                  <tr key={e.id}>
+                    <td className="num">#{e.competition_number}</td>
+                    <td>{who(e)}</td>
+                    <td>{e.entrant_type.toUpperCase()}</td>
+                    <td className="muted">{licenceOf(e)}</td>
+                    <td><button className="primary" onClick={() => runFor(e, choices.method, String(e.competition_number))}>Select</button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <button className="link" onClick={() => { setChoices(null); setFb(null) }}>Cancel</button>
         </div>
       )}
 
