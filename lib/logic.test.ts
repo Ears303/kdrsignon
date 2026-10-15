@@ -84,10 +84,22 @@ describe('decideScan', () => {
     expect(decideScan({ ...base, code: 'B2', mode: 'finish', recorded: rec }).kind).toBe('confirm')
     expect(decideScan({ ...base, code: 'B2', mode: 'dnf', recorded: rec }).kind).toBe('duplicate')
   })
-  it('briefing is per event, not per stage, and de-duplicates', () => {
-    const rec = { ...empty, briefing: [{ entrant_id: 'bike-1', attended_at: 't' }] }
-    expect(decideScan({ ...base, stageId: null, code: 'B1', mode: 'briefing', recorded: rec }).kind).toBe('duplicate')
-    expect(decideScan({ ...base, stageId: null, code: 'B2', mode: 'briefing', recorded: rec }).kind).toBe('record')
+  it('briefing is per stage and de-duplicates within that stage', () => {
+    const rec = { ...empty, briefing: [{ entrant_id: 'bike-1', stage_id: 's1', attended_at: 't' }] }
+    expect(decideScan({ ...base, code: 'B1', mode: 'briefing', recorded: rec }).kind).toBe('duplicate')
+    expect(decideScan({ ...base, code: 'B2', mode: 'briefing', recorded: rec }).kind).toBe('record')
+  })
+  it('a briefing for one stage does not count for another stage', () => {
+    const rec = { ...empty, briefing: [{ entrant_id: 'bike-1', stage_id: 's0', attended_at: 't' }] }
+    expect(decideScan({ ...base, stageId: 's1', code: 'B1', mode: 'briefing', recorded: rec }).kind).toBe('record')
+    expect(decideScan({ ...base, stageId: 's0', code: 'B1', mode: 'briefing', recorded: rec }).kind).toBe('duplicate')
+  })
+  it('an older briefing record with no stage does not count for any stage', () => {
+    const rec = { ...empty, briefing: [{ entrant_id: 'bike-1', stage_id: null, attended_at: 't' }] }
+    expect(decideScan({ ...base, code: 'B1', mode: 'briefing', recorded: rec }).kind).toBe('record')
+  })
+  it('a briefing scan needs a stage selected', () => {
+    expect(decideScan({ ...base, stageId: null, code: 'B1', mode: 'briefing', recorded: empty }).kind).toBe('not_found')
   })
 })
 
@@ -121,7 +133,11 @@ describe('computeReport', () => {
     ({ entrant_id: `bike-${n}`, stage_id: stage, point, scanned_at: 't' })
   const r = computeReport({
     entrants, type: 'bike', stageId: 's1',
-    briefing: [{ entrant_id: 'bike-1', attended_at: 't' }],
+    briefing: [
+      { entrant_id: 'bike-1', stage_id: 's1', attended_at: 't' },
+      // briefed for a different stage only, so still missing from s1
+      { entrant_id: 'bike-2', stage_id: 's0', attended_at: 't' },
+    ],
     scans: [sc('1', 'start'), sc('1', 'finish'), sc('2', 'start'), sc('3', 'start', 's0')],
     results: [{ entrant_id: 'bike-4', stage_id: 's1', status: 'dnf', reason: 'crash', recorded_at: 't' }],
   })
@@ -130,7 +146,10 @@ describe('computeReport', () => {
   it('excludes other vehicle types and non-active entrants from totals', () => {
     expect(r.total).toBe(4)
   })
-  it('lists who missed the briefing', () => expect(nums(r.briefing.missing)).toEqual(['2', '3', '4']))
+  it('lists who missed this stage briefing (a briefing for another stage does not count)', () => {
+    expect(nums(r.briefing.attended)).toEqual(['1'])
+    expect(nums(r.briefing.missing)).toEqual(['2', '3', '4'])
+  })
   it('lists who has not started (DNF and other-stage starts handled)', () =>
     expect(nums(r.start.missing)).toEqual(['3']))
   it('lists who is still on course', () => expect(nums(r.finish.onCourse)).toEqual(['2']))
