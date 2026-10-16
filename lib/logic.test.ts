@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import {
-  computeReport, csvToEntrants, decideScan, defaultScanCode, findEntrant, parseCsv, toCsv,
+  computeReport, CSV_TEMPLATE, csvToEntrants, decideScan, defaultScanCode, findEntrant, parseCsv, toCsv,
 } from './logic'
 import type { Entrant } from './types'
 
 const mk = (n: string, type: 'car' | 'bike', extra: Partial<Entrant> = {}): Entrant => ({
   id: `${type}-${n}`, event_id: 'e1', entrant_type: type, competition_number: n,
   scan_code: defaultScanCode(type, n), primary_name: `Name ${n}`, secondary_name: null,
-  class_name: null, vehicle_description: null, registration_number: null, status: 'active', status_note: null, ...extra,
+  class_name: null, vehicle_description: null, registration_number: null, ridernet_id: null,
+  status: 'active', status_note: null, ...extra,
 })
 const empty = { briefing: [], scans: [], results: [] }
 
@@ -42,6 +43,18 @@ describe('csvToEntrants', () => {
     const r = csvToEntrants(parseCsv('Type,Number,Name\nbike,1,A\nbike,1,B\nplane,2,C\nbike,,D\ncar,1,E'), null)
     expect(r.entrants.map(e => e.primary_name)).toEqual(['A', 'E'])
     expect(r.errors).toHaveLength(3)
+  })
+  it('reads RidernetID from its column, and leaves it null when blank or absent', () => {
+    const r = csvToEntrants(parseCsv('Type,Number,Name,RidernetID\nbike,1,A,RN123\nbike,2,B,'), null)
+    expect(r.errors).toEqual([])
+    expect(r.entrants.map(e => e.ridernet_id)).toEqual(['RN123', null])
+    const noCol = csvToEntrants(parseCsv('Type,Number,Name\nbike,1,A'), null)
+    expect(noCol.entrants[0].ridernet_id).toBeNull()
+  })
+  it('the template imports cleanly with RidernetIDs', () => {
+    const r = csvToEntrants(parseCsv(CSV_TEMPLATE), null)
+    expect(r.errors).toEqual([])
+    expect(r.entrants.map(e => e.ridernet_id)).toEqual(['RN123456', 'RN654321'])
   })
 })
 
