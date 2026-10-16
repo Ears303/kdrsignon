@@ -55,6 +55,7 @@ const HEADER_ALIASES: Record<string, string[]> = {
   class_name: ['class', 'classname', 'grade'],
   vehicle_description: ['vehicle', 'vehicledescription', 'makemodel', 'machine'],
   registration_number: ['rego', 'registration', 'registrationnumber', 'plate'],
+  ridernet_id: ['ridernetid', 'ridernet', 'ridernetno', 'riderid'],
 }
 
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '')
@@ -119,15 +120,15 @@ export function csvToEntrants(rows: string[][], defaultType: EntrantType | null)
       class_name: get(r, 'class_name') || null,
       vehicle_description: get(r, 'vehicle_description') || null,
       registration_number: get(r, 'registration_number') || null,
+      ridernet_id: get(r, 'ridernet_id') || null,
     })
   })
   return { entrants, errors }
 }
-
 export const CSV_TEMPLATE =
-  'Type,Number,Name,Co-driver,Class,Vehicle,Rego,Scan code\r\n' +
-  'bike,12,Jane Citizen,,Open,Yamaha MT-07,1ABC234,\r\n' +
-  'car,5,John Smith,Sam Jones,Club,Datsun 1600,1XYZ987,\r\n'
+  'Type,Number,Name,Co-driver,Class,Vehicle,Rego,Scan code,RidernetID\r\n' +
+  'bike,12,Jane Citizen,,Open,Yamaha MT-07,1ABC234,,RN123456\r\n' +
+  'car,5,John Smith,Sam Jones,Club,Datsun 1600,1XYZ987,,RN654321\r\n'
 
 // ------------------------------------------------------------------ lookup
 
