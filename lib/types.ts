@@ -22,6 +22,7 @@ export interface Entrant {
   class_name: string | null
   vehicle_description: string | null
   registration_number: string | null
+  ridernet_id: string | null
   status: EntrantStatus
   status_note: string | null
 }
