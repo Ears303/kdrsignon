@@ -5,14 +5,19 @@ import { useEffect } from 'react'
 import { useApp } from './AppProvider'
 import { isConfigured } from '@/lib/supabase'
 
-const NAV = [
-  { href: '/', label: 'Event' },
-  { href: '/scan', label: 'Scan' },
-  { href: '/reports', label: 'Reports' },
-  { href: '/entrants', label: 'Entrants' },
-  { href: '/labels', label: 'Labels' },
-  { href: '/medical', label: 'Medical', medical: true },
-  { href: '/tech-inspection', label: 'Tech Inspection' },
+type App = ReturnType<typeof useApp>
+
+// Which pages each role may open. The menu hides the rest, and typing the
+// address of a hidden page shows "no access". (The database enforces the same
+// limits; this just keeps people from landing on pages that will not work.)
+const NAV: { href: string; label: string; show: (a: App) => boolean }[] = [
+  { href: '/', label: 'Event', show: () => true },
+  { href: '/scan', label: 'Scan', show: a => a.canRecord },
+  { href: '/reports', label: 'Reports', show: a => a.canReports },
+  { href: '/entrants', label: 'Entrants', show: a => a.canEntrants },
+  { href: '/labels', label: 'Labels', show: a => a.canManage },
+  { href: '/medical', label: 'Medical', show: a => a.canMedical },
+  { href: '/tech-inspection', label: 'Tech Inspection', show: a => a.canReview },
 ]
 
 export function Shell({ children, needEvent = false }: { children: React.ReactNode; needEvent?: boolean }) {
@@ -32,17 +37,24 @@ export function Shell({ children, needEvent = false }: { children: React.ReactNo
   }
   if (!app.ready || !app.session) return <div className="wrap muted">Loading…</div>
 
+  // the page being viewed, if it is one of the menu pages (sub-pages count too)
+  const current = NAV.find(n => n.href !== '/' && (path === n.href || path.startsWith(n.href + '/')))
+  const blocked = !!app.role && !!current && !current.show(app)
+
   return (
     <>
       <header className="top">
         <nav>
-          {NAV.filter(n => !('medical' in n) || app.canMedical).map(n => (
+          {NAV.filter(n => n.show(app)).map(n => (
             <Link key={n.href} href={n.href} className={path === n.href ? 'active' : ''}>{n.label}</Link>
           ))}
         </nav>
         <div className="who">
           {app.event && <span className="evt">{app.event.name}</span>}
-          <span className="role">{app.role ?? 'no role'}</span>
+          <span className="role">
+            {app.role ?? 'no role'}
+            {app.role && app.scope !== 'both' ? ` · ${app.scope}s` : ''}
+          </span>
           <button className="link" onClick={() => app.signOut()}>Sign out</button>
         </div>
       </header>
@@ -51,6 +63,11 @@ export function Shell({ children, needEvent = false }: { children: React.ReactNo
           <div className="card warn">
             <h2>Your account has no role yet</h2>
             <p>You’re signed in as <b>{app.session.user.email}</b>, but an admin hasn’t given you access. Ask them to add you, or if you’re setting this up, run the “make the first admin” SQL at the bottom of <code>002_roles.sql</code>.</p>
+          </div>
+        ) : blocked ? (
+          <div className="card warn">
+            <h2>No access to this page</h2>
+            <p>Your role (<b>{app.role}</b>) can’t use {current!.label}. Use the menu above for the pages you can open, or ask an admin if you think this is wrong.</p>
           </div>
         ) : needEvent && !app.event ? (
           <div className="card">
