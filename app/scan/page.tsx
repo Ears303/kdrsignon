@@ -92,7 +92,7 @@ function Camera({ onCode, onError }: { onCode: (code: string) => void; onError: 
 }
 
 function Content() {
-  const { event } = useApp()
+  const { event, scanTypes, scanModes } = useApp()
   const eventId = event?.id ?? null
   const overlay = useMemo(() => (eventId ? overlayPending(eventId) : undefined), [eventId])
   const { data, setData, state, error, reload } = useEventData(eventId, overlay)
@@ -120,6 +120,14 @@ function Content() {
   useEffect(() => {
     try { const s = JSON.parse(localStorage.getItem(STATION_KEY) ?? 'null'); if (s) setStation(s) } catch {}
   }, [])
+  // keep the station inside what this person's role allows (e.g. a saved CAR station on a bike-only login)
+  useEffect(() => {
+    setStation(s => {
+      const type = scanTypes.includes(s.type) ? s.type : (scanTypes[0] ?? s.type)
+      const mode = scanModes.includes(s.mode) ? s.mode : (scanModes[0] ?? s.mode)
+      return type === s.type && mode === s.mode ? s : { ...s, type, mode }
+    })
+  }, [scanTypes, scanModes])
   const update = (patch: Partial<Station>) => setStation(s => {
     const n = { ...s, ...patch }
     try { localStorage.setItem(STATION_KEY, JSON.stringify(n)) } catch {}
@@ -296,10 +304,10 @@ function Content() {
       <div className="card">
         <div className="row" style={{ marginBottom: 10 }}>
           <div className="seg">
-            {(['bike', 'car'] as const).map(t => <button key={t} className={station.type === t ? 'on' : ''} onClick={() => update({ type: t })}>{t.toUpperCase()}</button>)}
+            {(['bike', 'car'] as const).filter(t => scanTypes.includes(t)).map(t => <button key={t} className={station.type === t ? 'on' : ''} onClick={() => update({ type: t })}>{t.toUpperCase()}</button>)}
           </div>
           <div className="seg">
-            {MODES.map(m => <button key={m.id} className={station.mode === m.id ? 'on' : ''} onClick={() => update({ mode: m.id })}>{m.label}</button>)}
+            {MODES.filter(m => scanModes.includes(m.id)).map(m => <button key={m.id} className={station.mode === m.id ? 'on' : ''} onClick={() => update({ mode: m.id })}>{m.label}</button>)}
           </div>
         </div>
         {needsStage && (
