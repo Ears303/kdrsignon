@@ -2,7 +2,7 @@ export type EntrantType = 'car' | 'bike'
 export type EntrantStatus = 'active' | 'withdrawn' | 'dns' | 'medical_suspended'
 export type ScanPoint = 'start' | 'finish'
 export type Method = 'camera' | 'scanner' | 'manual'
-export type Role = 'admin' | 'control' | 'scanner' | 'viewer' | 'medical'
+export type Role = 'admin' | 'control' | 'scanner' | 'viewer' | 'medical' | 'dnf_entry' | 'scrutineer'
 
 export interface EventRow {
   id: string
@@ -22,7 +22,6 @@ export interface Entrant {
   class_name: string | null
   vehicle_description: string | null
   registration_number: string | null
-  ridernet_id: string | null
   status: EntrantStatus
   status_note: string | null
 }
