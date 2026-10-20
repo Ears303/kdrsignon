@@ -1,185 +1,463 @@
-'use client'
-import { useEffect, useMemo, useState } from 'react'
-import { Shell } from '@/components/Shell'
-import { useApp } from '@/components/AppProvider'
-import { getSupabase } from '@/lib/supabase'
-import { useEventData } from '@/lib/useEventData'
-import { computeReport, toCsv } from '@/lib/logic'
-import { downloadText } from '@/lib/download'
-import type { Entrant, EntrantType } from '@/lib/types'
+"use client";
 
-const people = (e: Entrant) => [e.primary_name, e.secondary_name].filter(Boolean).join(' / ')
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import styles from "./scrutineering.module.css";
 
-function List({ title, hint, rows, filename, extra, action }: {
-  title: string; hint?: string; rows: Entrant[]; filename: string
-  extra?: { head: string; cell: (e: Entrant) => React.ReactNode }
-  action?: { label: string; run: (e: Entrant) => void }
-}) {
+// ------------------------------------------------------------------
+// LANDING PAGE TEXT - edit the wording here.
+// ------------------------------------------------------------------
+const INTRO_TITLE = "Technical Self-Scrutineering";
+
+const INTRO_TEXT =
+  "All items below are to be completed prior to the closing date for this form to be accepted. Missing or incomplete items will see your machine needing to be presented to the Scrutineer for inspection.";
+
+const NOTES_TITLE = "NOTE:";
+
+const NOTES: string[] = [
+  "Random scrutineering will be conducted on machines and rider safety gear across all classes throughout the event.",
+  "Incomplete forms will not be accepted. Please check your email for notification of any errors.",
+  "One scrutineering sheet must be completed per machine.",
+  "For juniors, both the rider and parent or guardian must sign this form for it to be considered complete.",
+  "Please ensure you provide your correct MA Competition Licence Number, now known as your RidernetID. This is a 6 digit number.",
+];
+
+// Links shown under the notes
+const MA_RULES_URL = "https://www.ma.org.au/licences-rules/rules/";
+const MOMS_URL =
+  "https://drive.google.com/file/d/1Gz-T_HGwlGmNXAv9k3MtjVjAAoAi599i/view?usp=sharing";
+
+const BEFORE_YOU_START_TITLE = "Before you start, have ready:";
+
+const BEFORE_YOU_START: string[] = [
+  "Your RidernetID (6 digits)",
+  "Your machine's VIN",
+  "A 2 litre water container or CamelBak-type hydration system",
+  "Body armour which complies",
+];
+
+type Entrant = {
+  id: string;
+  eventId: string;
+  riderName: string;
+  competitionNumber: string;
+  className: string | null;
+  vehicleDescription: string | null;
+  registrationNumber: string | null;
+};
+
+type Item = {
+  id: string;
+  code: string;
+  section: string;
+  item_name: string;
+  requirement: string | null;
+  display_order: number;
+  is_required: boolean;
+};
+
+type Result = "pass" | "fail" | "na";
+type Answer = { result?: Result; comment: string };
+
+// Items that are highlighted and must be PASS to submit
+const MUST_PASS: Record<string, string> = {
+  HYDRATION: "You must have a 2 litre water container or CamelBak-type system to ride.",
+  BODY_ARMOUR: "You must have body armour which complies to ride.",
+};
+
+export default function ScrutineeringPage() {
+  const [ridernetId, setRidernetId] = useState("");
+  const [entrant, setEntrant] = useState<Entrant | null>(null);
+  const [choices, setChoices] = useState<Entrant[]>([]);
+  const [items, setItems] = useState<Item[]>([]);
+  const [answers, setAnswers] = useState<Record<string, Answer>>({});
+  const [vin, setVin] = useState("");
+  const [isJunior, setIsJunior] = useState(false);
+  const [riderName, setRiderName] = useState("");
+  const [parentName, setParentName] = useState("");
+  const [accepted, setAccepted] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [done, setDone] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/rider/scrutineering/checklist")
+      .then((r) => r.json())
+      .then((j) => {
+        if (j.error) setError(j.error);
+        setItems(j.checklist ?? []);
+      })
+      .catch(() => setError("Checklist could not be loaded."));
+  }, []);
+
+  const sections = useMemo(
+    () => Array.from(new Set(items.map((i) => i.section))),
+    [items]
+  );
+
+  async function lookup(e: FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      const r = await fetch("/api/rider/lookup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ridernetId }),
+      });
+      const j = await r.json();
+      if (!r.ok) {
+        setError(j.error);
+        return;
+      }
+      const found: Entrant[] = j.entrants ?? [];
+      if (found.length === 1) {
+        chooseEntrant(found[0]);
+      } else {
+        setChoices(found);
+      }
+    } catch {
+      setError("Unable to check the entry.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function chooseEntrant(e: Entrant) {
+    setEntrant(e);
+    setRiderName(e.riderName ?? "");
+  }
+
+  function setResult(id: string, result: Result) {
+    setAnswers((a) => ({ ...a, [id]: { result, comment: a[id]?.comment ?? "" } }));
+  }
+
+  function setComment(id: string, comment: string) {
+    setAnswers((a) => ({ ...a, [id]: { result: a[id]?.result, comment } }));
+  }
+
+  function startAgain() {
+    setRidernetId("");
+    setEntrant(null);
+    setChoices([]);
+    setAnswers({});
+    setVin("");
+    setIsJunior(false);
+    setRiderName("");
+    setParentName("");
+    setAccepted(false);
+    setError("");
+    setDone(false);
+    window.scrollTo(0, 0);
+  }
+
+  function closeForm() {
+    window.close();
+    // Phones usually block close(), so fall back to the home page
+    setTimeout(() => {
+      window.location.href = "/";
+    }, 300);
+  }
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    if (!entrant) return;
+
+    if (!vin.trim()) {
+      setError("Please enter the VIN.");
+      document.getElementById("vin-box")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+
+    const missing = items.find((i) => i.is_required && !answers[i.id]?.result);
+    if (missing) {
+      setError(`Please complete: ${missing.item_name}`);
+      document.getElementById(missing.id)?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+
+    for (const item of items) {
+      const message = MUST_PASS[item.code];
+      if (message && answers[item.id]?.result !== "pass") {
+        setError(message);
+        document.getElementById(item.id)?.scrollIntoView({ behavior: "smooth", block: "center" });
+        return;
+      }
+    }
+
+    if (!accepted) return setError("Please accept the declaration.");
+    if (!riderName.trim()) return setError("Please enter the rider printed name.");
+    if (isJunior && !parentName.trim()) return setError("Please enter the parent or guardian name.");
+
+    setBusy(true);
+    setError("");
+    try {
+      const r = await fetch("/api/rider/scrutineering/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ridernetId,
+          entrantId: entrant.id,
+          vin: vin.trim(),
+          isJunior,
+          declarationAccepted: accepted,
+          riderPrintedName: riderName,
+          parentGuardianPrintedName: parentName,
+          answers: items.map((i) => ({
+            checklistId: i.id,
+            result: answers[i.id]?.result,
+            comment: answers[i.id]?.comment ?? "",
+          })),
+        }),
+      });
+      const j = await r.json();
+      if (!r.ok) {
+        setError(j.error);
+        return;
+      }
+      setDone(true);
+      window.scrollTo(0, 0);
+    } catch {
+      setError("Submission failed. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (done) {
+    return (
+      <main className={styles.page}>
+        <section className={styles.success}>
+          <div className={styles.tick}>✓</div>
+          <h1>Submission received</h1>
+          <p>
+            {entrant?.riderName} — #{entrant?.competitionNumber}
+          </p>
+          <p>Your technical self-scrutineering has been recorded.</p>
+
+          <div className={styles.doneButtons}>
+            <button type="button" className={styles.primary} onClick={startAgain}>
+              Submit another form
+            </button>
+            <button type="button" className={styles.secondary} onClick={closeForm}>
+              Close
+            </button>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
   return (
-    <div className="card">
-      <div className="row" style={{ justifyContent: 'space-between' }}>
-        <h2 style={{ margin: 0 }}>{title} <span className={`pill ${rows.length ? 'warn' : 'ok'}`}>{rows.length}</span></h2>
-        <button disabled={!rows.length} onClick={() => downloadText(filename, toCsv([
-          ['Number', 'Name', 'Class', 'Vehicle', 'Rego'],
-          ...rows.map(e => [e.competition_number, people(e), e.class_name, e.vehicle_description, e.registration_number]),
-        ]))}>Export CSV</button>
-      </div>
-      {hint && <p className="muted small">{hint}</p>}
-      {rows.length === 0 ? <p className="muted">None 🎉</p> : (
-        <div className="tablewrap">
-          <table>
-            <thead><tr><th>No.</th><th>Name</th><th>Class</th><th>Vehicle</th>{extra && <th>{extra.head}</th>}{action && <th />}</tr></thead>
-            <tbody>
-              {rows.map(e => (
-                <tr key={e.id}>
-                  <td className="num">{e.competition_number}</td><td>{people(e)}</td><td>{e.class_name}</td>
-                  <td>{e.vehicle_description}{e.registration_number && <span className="muted small"> · {e.registration_number}</span>}</td>
-                  {extra && <td>{extra.cell(e)}</td>}
-                  {action && <td><button onClick={() => action.run(e)}>{action.label}</button></td>}
-                </tr>
+    <main className={styles.page}>
+      <div className={styles.wrap}>
+        <h1>Technical Self-Scrutineering</h1>
+
+        {!entrant && (
+          <section
+            style={{
+              background: "#eff6ff",
+              border: "1px solid #bfdbfe",
+              borderRadius: "12px",
+              padding: "18px 20px",
+              margin: "16px 0",
+              color: "#1e3a8a",
+              lineHeight: 1.5,
+            }}
+          >
+            <h2 style={{ margin: "0 0 10px", fontSize: "19px" }}>{INTRO_TITLE}</h2>
+
+            <p style={{ margin: "8px 0" }}>{INTRO_TEXT}</p>
+
+            <p style={{ margin: "14px 0 6px", fontWeight: 700 }}>{NOTES_TITLE}</p>
+            <ol style={{ margin: 0, paddingLeft: "22px" }}>
+              {NOTES.map((line, i) => (
+                <li key={i} style={{ margin: "6px 0" }}>
+                  {line}
+                </li>
               ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  )
-}
+            </ol>
 
-function Content() {
-  const { event, canManage, canRecord, canMedical } = useApp()
-  const { data, state, error, reload } = useEventData(event?.id ?? null)
-  const [type, setType] = useState<EntrantType>('bike')
-  const [stageId, setStageId] = useState('')
-  const [msg, setMsg] = useState('')
-  const [updated, setUpdated] = useState<Date | null>(null)
+            <p style={{ margin: "14px 0 4px" }}>
+              Motorcycling Australia Rules can be reviewed at the link below:
+            </p>
+            <p style={{ margin: "0 0 10px", wordBreak: "break-all" }}>
+              <a
+                href={MA_RULES_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: "#1d4ed8", fontWeight: 700, textDecoration: "underline" }}
+              >
+                {MA_RULES_URL}
+              </a>
+            </p>
 
-  useEffect(() => { const t = setInterval(() => { void reload(true) }, 20000); return () => clearInterval(t) }, [reload])
-  useEffect(() => { if (state === 'ready') setUpdated(new Date()) }, [data, state])
+            <p style={{ margin: "10px 0" }}>
+              Manual of Motorcycle Sport (MOMS):{" "}
+              <a
+                href={MOMS_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: "#1d4ed8", fontWeight: 700, textDecoration: "underline" }}
+              >
+                Open the MOMS
+              </a>
+            </p>
 
-  const stages = useMemo(() => data.stages.filter(s => s.enabled), [data.stages])
-  const stage = stages.find(s => s.id === stageId) ?? stages[0]
-
-  const rep = useMemo(() => stage ? computeReport({
-    entrants: data.entrants, type, stageId: stage.id, briefing: data.briefing, scans: data.scans, results: data.results,
-  }) : null, [data, type, stage])
-
-  async function markDnf(e: Entrant) {
-    if (!stage) return
-    const reason = prompt(`Mark #${e.competition_number} ${e.primary_name} as DNF for ${stage.name}. Reason (optional):`)
-    if (reason === null) return
-    const { error: err } = await getSupabase().from('stage_results').insert({
-      event_id: event!.id, entrant_id: e.id, stage_id: stage.id, status: 'dnf', reason: reason.trim() || null,
-    })
-    if (err) setMsg(err.message); else { setMsg(''); void reload() }
-  }
-
-  async function reinstate(e: Entrant) {
-    if (!stage || !confirm(`Remove DNF for #${e.competition_number} ${e.primary_name}?`)) return
-    const { data: gone, error: err } = await getSupabase().from('stage_results').delete()
-      .eq('event_id', event!.id).eq('entrant_id', e.id).eq('stage_id', stage.id).select('id')
-    if (err || !gone?.length) setMsg(err?.message ?? 'Could not remove (no permission?)'); else { setMsg(''); void reload() }
-  }
-
-  async function liftSuspension(e: Entrant) {
-    if (!confirm(`Lift the medical suspension for #${e.competition_number} ${e.primary_name}? They will be able to scan again.`)) return
-    const { error: err } = await getSupabase().rpc('set_medical_suspension', { p_entrant: e.id, p_suspend: false })
-    if (err) setMsg(err.message); else { setMsg(''); void reload(true) }
-  }
-
-  const pct = (n: number) => (rep && rep.total ? Math.round((n / rep.total) * 100) : 0)
-
-  return (
-    <>
-      <div className="row" style={{ justifyContent: 'space-between' }}>
-        <h1>Reports</h1>
-        <span className="muted small">{updated ? `Updated ${updated.toLocaleTimeString()}` : ''} · <button className="link" onClick={() => reload()}>Refresh</button></span>
-      </div>
-      {state === 'cached' && <div className="banner warn">Offline — showing the last saved data.</div>}
-      {state === 'error' && <div className="banner bad">{error}</div>}
-      <div className="card row">
-        <div className="seg">{(['bike', 'car'] as const).map(t => <button key={t} className={type === t ? 'on' : ''} onClick={() => setType(t)}>{t.toUpperCase()}</button>)}</div>
-        <div className="seg">{stages.map(s => <button key={s.id} className={stage?.id === s.id ? 'on' : ''} onClick={() => setStageId(s.id)}>{s.name}</button>)}</div>
-      </div>
-      {msg && <p className="bad-text">{msg}</p>}
-
-      {!rep ? <p className="muted">No stages enabled.</p> : (
-        <>
-          <div className="stats">
-            <div className="stat"><b>{rep.briefing.attended.length}/{rep.total}</b><span>briefed ({pct(rep.briefing.attended.length)}%)</span></div>
-            <div className="stat"><b>{rep.start.done.length}</b><span>started {stage!.name}</span></div>
-            <div className="stat"><b>{rep.finish.onCourse.length}</b><span>on course</span></div>
-            <div className="stat"><b>{rep.finish.done.length}</b><span>finished</span></div>
-            <div className="stat"><b>{rep.dnf.length}</b><span>DNF</span></div>
-          </div>
-
-          {rep.suspended.length > 0 && (
-            <div className="card bad">
-              <h2>Medically suspended — not permitted to scan <span className="pill bad">{rep.suspended.length}</span></h2>
-              <div className="tablewrap"><table>
-                <thead><tr><th>No.</th><th>Name</th><th>Class</th><th>Note</th>{canMedical && <th />}</tr></thead>
-                <tbody>{rep.suspended.map(e => (
-                  <tr key={e.id}>
-                    <td className="num">{e.competition_number}</td><td>{people(e)}</td><td>{e.class_name}</td><td>{e.status_note}</td>
-                    {canMedical && <td><button onClick={() => liftSuspension(e)}>Lift suspension</button></td>}
-                  </tr>))}
-                </tbody></table></div>
-            </div>
-          )}
-
-          <List title="Missing — not at briefing" hint="Briefing applies to the whole event, not one stage."
-            rows={rep.briefing.missing} filename={`${type}-briefing-missing.csv`} />
-
-          <div className="card">
-            <div className="row" style={{ justifyContent: 'space-between' }}>
-              <h2>Starters — {stage!.name}, in order scanned <span className="pill ok">{rep.start.order.length}</span></h2>
-              <button disabled={!rep.start.order.length} onClick={() => downloadText(`${type}-${stage!.name}-starters.csv`, toCsv([
-                ['Order', 'Time', 'Number', 'Name', 'Class', 'Vehicle', 'Rego'],
-                ...rep.start.order.map((o, i) => [i + 1, new Date(o.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }), o.entrant.competition_number, people(o.entrant), o.entrant.class_name, o.entrant.vehicle_description, o.entrant.registration_number]),
-              ]))}>Export CSV</button>
-            </div>
-            {rep.start.order.length === 0 ? <p className="muted">Nobody has started this stage yet.</p> : (
-              <div className="tablewrap"><table>
-                <thead><tr><th>#</th><th>Time</th><th>No.</th><th>Name</th><th>Class</th><th>Vehicle</th></tr></thead>
-                <tbody>{rep.start.order.map((o, i) => (
-                  <tr key={o.entrant.id}>
-                    <td className="muted">{i + 1}</td>
-                    <td className="muted">{new Date(o.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</td>
-                    <td className="num">{o.entrant.competition_number}</td><td>{people(o.entrant)}</td><td>{o.entrant.class_name}</td>
-                    <td>{o.entrant.vehicle_description}{o.entrant.registration_number && <span className="muted small"> · {o.entrant.registration_number}</span>}</td>
-                  </tr>))}
-                </tbody></table></div>
+            {BEFORE_YOU_START.length > 0 && (
+              <>
+                <p style={{ margin: "14px 0 6px", fontWeight: 700 }}>{BEFORE_YOU_START_TITLE}</p>
+                <ul style={{ margin: 0, paddingLeft: "22px" }}>
+                  {BEFORE_YOU_START.map((line, i) => (
+                    <li key={i} style={{ margin: "4px 0" }}>
+                      {line}
+                    </li>
+                  ))}
+                </ul>
+              </>
             )}
-          </div>
+          </section>
+        )}
 
-          <List title="Missing — on course (started, not finished)" hint="Started this stage, no finish scan and not DNF. Chase these first."
-            rows={rep.finish.onCourse} filename={`${type}-${stage!.name}-on-course.csv`}
-            extra={{ head: 'Started', cell: e => { const s = data.scans.find(x => x.entrant_id === e.id && x.stage_id === stage!.id && x.point === 'start'); return s ? new Date(s.scanned_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '' } }}
-            action={canRecord ? { label: 'Mark DNF', run: markDnf } : undefined} />
+        {entrant && <p>Complete one form for each machine.</p>}
 
-          <List title="Missing — not started" hint="Active entrants with no start scan (and no finish or DNF) for this stage."
-            rows={rep.start.missing} filename={`${type}-${stage!.name}-not-started.csv`}
-            action={canRecord ? { label: 'Mark DNF', run: markDnf } : undefined} />
+        {error && <div className={styles.error}>{error}</div>}
 
-          <div className="card">
-            <h2>DNF — {stage!.name} <span className="pill bad">{rep.dnf.length}</span></h2>
-            {rep.dnf.length === 0 ? <p className="muted">None.</p> : (
-              <div className="tablewrap"><table>
-                <thead><tr><th>No.</th><th>Name</th><th>Reason</th><th>Time</th>{canManage && <th />}</tr></thead>
-                <tbody>{rep.dnf.map(d => (
-                  <tr key={d.entrant.id}>
-                    <td className="num">{d.entrant.competition_number}</td><td>{people(d.entrant)}</td><td>{d.reason}</td>
-                    <td className="muted">{new Date(d.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
-                    {canManage && <td><button onClick={() => reinstate(d.entrant)}>Remove DNF</button></td>}
-                  </tr>))}
-                </tbody></table></div>
-            )}
-          </div>
-        </>
-      )}
-    </>
-  )
-}
+        {!entrant && choices.length > 1 ? (
+          <section className={styles.card}>
+            <h2>Which entry is this form for?</h2>
+            <p>More than one entry was found for this RidernetID. Choose the machine for this form.</p>
+            {choices.map((c) => (
+              <button
+                type="button"
+                key={c.id}
+                className={styles.secondary}
+                style={{ display: "block", width: "100%", textAlign: "left", marginBottom: 8 }}
+                onClick={() => chooseEntrant(c)}
+              >
+                #{c.competitionNumber} — {c.className || "—"} — {c.vehicleDescription || "—"}
+              </button>
+            ))}
+            <button type="button" className={styles.secondary} onClick={() => setChoices([])}>
+              Not me — go back
+            </button>
+          </section>
+        ) : !entrant ? (
+          <form className={styles.card} onSubmit={lookup}>
+            <h2>Find your entry</h2>
+            <label>RidernetID</label>
+            <input
+              required
+              inputMode="numeric"
+              pattern="[0-9]{6}"
+              maxLength={6}
+              title="Your RidernetID is a 6 digit number"
+              value={ridernetId}
+              onChange={(e) => setRidernetId(e.target.value.trim())}
+            />
+            <button className={styles.primary} disabled={busy}>
+              {busy ? "Checking..." : "Find my entry"}
+            </button>
+          </form>
+        ) : (
+          <form onSubmit={submit}>
+            <section className={styles.card}>
+              <h2>Entry confirmed</h2>
+              <p><b>Rider:</b> {entrant.riderName}</p>
+              <p><b>Competition #:</b> {entrant.competitionNumber}</p>
+              <p><b>Class:</b> {entrant.className || "—"}</p>
+              <p><b>Machine:</b> {entrant.vehicleDescription || "—"}</p>
+              {entrant.registrationNumber && (
+                <p><b>Registration:</b> {entrant.registrationNumber}</p>
+              )}
+              <button type="button" className={styles.secondary} onClick={() => setEntrant(null)}>
+                Not me — go back
+              </button>
+            </section>
 
-export default function Page() { return <Shell needEvent><Content /></Shell>
+            <section className={styles.card} id="vin-box">
+              <h2>Machine VIN</h2>
+              <label>
+                VIN <span className={styles.req}>*</span>
+              </label>
+              <input
+                value={vin}
+                onChange={(e) => setVin(e.target.value.toUpperCase())}
+                autoCapitalize="characters"
+                autoComplete="off"
+                maxLength={40}
+              />
+            </section>
+
+            {sections.map((section) => (
+              <section className={styles.card} key={section}>
+                <h2>{section}</h2>
+                {items
+                  .filter((i) => i.section === section)
+                  .map((i) => (
+                    <div
+                      id={i.id}
+                      key={i.id}
+                      className={MUST_PASS[i.code] ? styles.hydration : styles.item}
+                    >
+                      <h3>
+                        {i.item_name}
+                        {i.is_required && <span className={styles.req}> *</span>}
+                      </h3>
+                      {i.requirement && <p>{i.requirement}</p>}
+                      <div className={styles.choices}>
+                        {(["pass", "fail", "na"] as const).map((v) => (
+                          <button
+                            type="button"
+                            key={v}
+                            className={answers[i.id]?.result === v ? styles[v] : ""}
+                            onClick={() => setResult(i.id, v)}
+                          >
+                            {v === "na" ? "N/A" : v.toUpperCase()}
+                          </button>
+                        ))}
+                      </div>
+                      <textarea
+                        placeholder="Comment if required"
+                        value={answers[i.id]?.comment ?? ""}
+                        onChange={(e) => setComment(i.id, e.target.value)}
+                      />
+                    </div>
+                  ))}
+              </section>
+            ))}
+
+            <section className={styles.card}>
+              <h2>Declaration</h2>
+              <p>
+                I acknowledge the importance of my protective clothing, equipment and machine
+                being in good condition and fit for the purpose of taking part in this event, and
+                that I alone am responsible for them being and remaining fit for purpose
+                throughout the event.
+              </p>
+              <label className={styles.check}>
+                <input type="checkbox" checked={accepted} onChange={(e) => setAccepted(e.target.checked)} />
+                I accept the declaration *
+              </label>
+              <label>Rider printed name *</label>
+              <input value={riderName} onChange={(e) => setRiderName(e.target.value)} />
+              <label className={styles.check}>
+                <input type="checkbox" checked={isJunior} onChange={(e) => setIsJunior(e.target.checked)} />
+                Junior rider
+              </label>
+              {isJunior && (
+                <>
+                  <label>Parent / guardian printed name *</label>
+                  <input value={parentName} onChange={(e) => setParentName(e.target.value)} />
+                </>
+              )}
+            </section>
+
+            <button className={styles.submit} disabled={busy}>
+              {busy ? "Submitting..." : "Submit self-scrutineering"}
+            </button>
+          </form>
+        )}
+      </div>
+    </main>
+  );
 }
