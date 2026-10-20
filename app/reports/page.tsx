@@ -114,6 +114,7 @@ function Content() {
           </div>
 
           {rep.suspended.length > 0 && (
+                    {rep.suspended.length > 0 && (
             <div className="card bad">
               <h2>Medically suspended — not permitted to scan <span className="pill bad">{rep.suspended.length}</span></h2>
               <div className="tablewrap"><table>
@@ -126,6 +127,7 @@ function Content() {
                 </tbody></table></div>
             </div>
           )}
+
           <List title="Missing — not at briefing" hint="Briefing applies to the whole event, not one stage."
             rows={rep.briefing.missing} filename={`${type}-briefing-missing.csv`} />
 
@@ -149,6 +151,7 @@ function Content() {
                   </tr>))}
                 </tbody></table></div>
             )}
+          </div>
 
           <List title="Missing — on course (started, not finished)" hint="Started this stage, no finish scan and not DNF. Chase these first."
             rows={rep.finish.onCourse} filename={`${type}-${stage!.name}-on-course.csv`}
@@ -159,7 +162,7 @@ function Content() {
             rows={rep.start.missing} filename={`${type}-${stage!.name}-not-started.csv`}
             action={canRecord ? { label: 'Mark DNF', run: markDnf } : undefined} />
 
-           <div className="card">
+          <div className="card">
             <h2>DNF — {stage!.name} <span className="pill bad">{rep.dnf.length}</span></h2>
             {rep.dnf.length === 0 ? <p className="muted">None.</p> : (
               <div className="tablewrap"><table>
@@ -179,4 +182,5 @@ function Content() {
   )
 }
 
+export default function Page() { return <Shell needEvent><Content /></Shell> }
 export default function Page() { return <Shell needEvent><Content /></Shell> }
