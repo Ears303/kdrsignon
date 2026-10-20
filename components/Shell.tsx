@@ -44,6 +44,9 @@ export function Shell({ children, needEvent = false }: { children: React.ReactNo
   return (
     <>
       <header className="top">
+        <Link href="/" style={{ display: 'flex', alignItems: 'center', marginRight: 12 }}>
+          <img src="/logo.png" alt="Event logo" style={{ height: 36, width: 'auto', display: 'block' }} />
+        </Link>
         <nav>
           {NAV.filter(n => n.show(app)).map(n => (
             <Link key={n.href} href={n.href} className={path === n.href ? 'active' : ''}>{n.label}</Link>
