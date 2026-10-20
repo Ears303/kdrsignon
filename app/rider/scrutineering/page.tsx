@@ -244,6 +244,11 @@ export default function ScrutineeringPage() {
   return (
     <main className={styles.page}>
       <div className={styles.wrap}>
+        <img
+  src="/logo.png"
+  alt="Event logo"
+  style={{ display: "block", maxWidth: "220px", width: "100%", height: "auto", margin: "0 auto 16px" }}
+/>
         <h1>Technical Self-Scrutineering</h1>
 
         {!entrant && (
