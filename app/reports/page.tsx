@@ -126,6 +126,8 @@ function Content() {
                 </tbody></table></div>
             </div>
           )}
+          <List title="Missing — not at briefing" hint="Briefing applies to the whole event, not one stage."
+            rows={rep.briefing.missing} filename={`${type}-briefing-missing.csv`} />
 
           <div className="card">
             <div className="row" style={{ justifyContent: 'space-between' }}>
@@ -147,9 +149,6 @@ function Content() {
                   </tr>))}
                 </tbody></table></div>
             )}
-          </div>
-            <List title="Missing — not at briefing" hint="Briefing applies to the whole event, not one stage."
-            rows={rep.briefing.missing} filename={`${type}-briefing-missing.csv`} />
 
           <List title="Missing — on course (started, not finished)" hint="Started this stage, no finish scan and not DNF. Chase these first."
             rows={rep.finish.onCourse} filename={`${type}-${stage!.name}-on-course.csv`}
