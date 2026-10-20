@@ -112,7 +112,7 @@ function Content() {
             <div className="stat"><b>{rep.finish.done.length}</b><span>finished</span></div>
             <div className="stat"><b>{rep.dnf.length}</b><span>DNF</span></div>
           </div>
-         
+
           {rep.suspended.length > 0 && (
             <div className="card bad">
               <h2>Medically suspended — not permitted to scan <span className="pill bad">{rep.suspended.length}</span></h2>
@@ -181,5 +181,5 @@ function Content() {
   )
 }
 
-export default function Page() { return <Shell needEvent><Content /></Shell> }
-export default function Page() { return <Shell needEvent><Content /></Shell> }
+export default function Page() { return <Shell needEvent><Content /></Shell>
+}
