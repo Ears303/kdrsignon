@@ -148,6 +148,8 @@ function Content() {
                 </tbody></table></div>
             )}
           </div>
+            <List title="Missing — not at briefing" hint="Briefing applies to the whole event, not one stage."
+            rows={rep.briefing.missing} filename={`${type}-briefing-missing.csv`} />
 
           <List title="Missing — on course (started, not finished)" hint="Started this stage, no finish scan and not DNF. Chase these first."
             rows={rep.finish.onCourse} filename={`${type}-${stage!.name}-on-course.csv`}
@@ -158,10 +160,7 @@ function Content() {
             rows={rep.start.missing} filename={`${type}-${stage!.name}-not-started.csv`}
             action={canRecord ? { label: 'Mark DNF', run: markDnf } : undefined} />
 
-          <List title="Missing — not at briefing" hint="Briefing applies to the whole event, not one stage."
-            rows={rep.briefing.missing} filename={`${type}-briefing-missing.csv`} />
-
-          <div className="card">
+           <div className="card">
             <h2>DNF — {stage!.name} <span className="pill bad">{rep.dnf.length}</span></h2>
             {rep.dnf.length === 0 ? <p className="muted">None.</p> : (
               <div className="tablewrap"><table>
