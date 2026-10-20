@@ -30,7 +30,6 @@ const BEFORE_YOU_START_TITLE = "Before you start, have ready:";
 
 const BEFORE_YOU_START: string[] = [
   "Your RidernetID (6 digits)",
-  "Your competition number",
   "Your machine's VIN",
   "A 2 litre water container or CamelBak-type hydration system",
   "Body armour which complies",
@@ -67,7 +66,6 @@ const MUST_PASS: Record<string, string> = {
 
 export default function ScrutineeringPage() {
   const [ridernetId, setRidernetId] = useState("");
-  const [competitionNumber, setCompetitionNumber] = useState("");
   const [entrant, setEntrant] = useState<Entrant | null>(null);
   const [items, setItems] = useState<Item[]>([]);
   const [answers, setAnswers] = useState<Record<string, Answer>>({});
@@ -103,7 +101,7 @@ export default function ScrutineeringPage() {
       const r = await fetch("/api/rider/lookup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ridernetId, competitionNumber }),
+        body: JSON.stringify({ ridernetId }),
       });
       const j = await r.json();
       if (!r.ok) {
@@ -129,7 +127,6 @@ export default function ScrutineeringPage() {
 
   function startAgain() {
     setRidernetId("");
-    setCompetitionNumber("");
     setEntrant(null);
     setAnswers({});
     setVin("");
@@ -188,7 +185,6 @@ export default function ScrutineeringPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ridernetId,
-          competitionNumber,
           entrantId: entrant.id,
           vin: vin.trim(),
           isJunior,
@@ -318,14 +314,15 @@ export default function ScrutineeringPage() {
         {!entrant ? (
           <form className={styles.card} onSubmit={lookup}>
             <h2>Find your entry</h2>
-            <label>RideNet ID</label>
-            <input required value={ridernetId} onChange={(e) => setRidernetId(e.target.value)} />
-            <label>Competition number</label>
+            <label>RidernetID</label>
             <input
               required
               inputMode="numeric"
-              value={competitionNumber}
-              onChange={(e) => setCompetitionNumber(e.target.value)}
+              pattern="[0-9]{6}"
+              maxLength={6}
+              title="Your RidernetID is a 6 digit number"
+              value={ridernetId}
+              onChange={(e) => setRidernetId(e.target.value.trim())}
             />
             <button className={styles.primary} disabled={busy}>
               {busy ? "Checking..." : "Find my entry"}
