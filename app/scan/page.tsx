@@ -227,7 +227,13 @@ function Content() {
     // Briefing: licence (RidernetID) first. Everywhere: number, RidernetID, scan code or name.
     let matches: Entrant[] = station.mode === 'briefing' ? findByLicence(data.entrants, c) : []
     if (!matches.length) matches = findEntrants(data.entrants, c).map(h => h.entrant)
-
+        // Co-drivers share a race number as 660_1, 660_2 ... so typing 660 lists them all
+    const q = c.toUpperCase()
+    const sharing = data.entrants.filter(e => {
+      const n = e.competition_number.toUpperCase()
+      return e.entrant_type === station.type && (n === q || n.startsWith(q + '_'))
+    })
+    if (sharing.length > 1) matches = sharing
     // same number in bike and car: keep the one for this station
     if (matches.length > 1) {
       const ofType = matches.filter(e => e.entrant_type === station.type)
