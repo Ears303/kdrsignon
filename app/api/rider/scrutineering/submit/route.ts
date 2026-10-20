@@ -12,7 +12,6 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const ridernetId = String(body.ridernetId ?? "").trim();
-    const competitionNumber = String(body.competitionNumber ?? "").trim();
     const entrantId = String(body.entrantId ?? "");
     const vin = String(body.vin ?? "").trim().toUpperCase();
     const riderPrintedName = String(body.riderPrintedName ?? "").trim();
@@ -21,7 +20,7 @@ export async function POST(request: Request) {
     const declarationAccepted = body.declarationAccepted === true;
     const answers: any[] = Array.isArray(body.answers) ? body.answers : [];
 
-    if (!ridernetId || !competitionNumber || !entrantId || !riderPrintedName || !declarationAccepted) {
+    if (!ridernetId || !entrantId || !riderPrintedName || !declarationAccepted) {
       return NextResponse.json({ error: "Required submission details are missing." }, { status: 400 });
     }
     if (!vin) {
@@ -40,7 +39,6 @@ export async function POST(request: Request) {
       .select(ENTRANT_COLUMNS)
       .eq("id", entrantId)
       .eq("ridernet_id", ridernetId)
-      .eq("competition_number", competitionNumber)
       .limit(1);
     if (entrantError) throw entrantError;
 
