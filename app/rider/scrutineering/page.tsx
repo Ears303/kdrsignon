@@ -108,8 +108,13 @@ export default function ScrutineeringPage() {
         setError(j.error);
         return;
       }
-      setEntrant(j.entrant);
-      setRiderName(j.entrant.riderName ?? "");
+           const first = j.entrants?.[0];
+      if (!first) {
+        setError("Entry not found. Check your RidernetID and try again.");
+        return;
+      }
+      setEntrant(first);
+      setRiderName(first.riderName ?? "");
     } catch {
       setError("Unable to check the entry.");
     } finally {
