@@ -59,6 +59,8 @@ export default function TechInspectionPage() {
   const [detail, setDetail] = useState<any>(null)
   const [checks, setChecks] = useState<Check[]>([])
   const [notes, setNotes] = useState('')
+  const [editingVin, setEditingVin] = useState(false)
+  const [vinDraft, setVinDraft] = useState('')
 
   const headers = useCallback(
     () => ({ Authorization: `Bearer ${token ?? ''}`, 'Content-Type': 'application/json' }),
@@ -91,6 +93,7 @@ export default function TechInspectionPage() {
 
   async function openDetail(id: string) {
     setSelectedId(id)
+    setEditingVin(false)
     setDetail(null)
     setChecks([])
     setError('')
@@ -124,7 +127,23 @@ export default function TechInspectionPage() {
     setDetail((d: any) => ({ ...d, status, review_notes: notes }))
     loadList()
   }
-
+  async function saveVin() {
+    if (!selectedId) return
+    const vin = vinDraft.trim().toUpperCase()
+    if (!vin) { setError('The VIN cannot be empty.'); return }
+    setBusy(true)
+    setError('')
+    const r = await fetch(`/api/admin/scrutineering/${selectedId}`, {
+      method: 'PATCH',
+      headers: headers(),
+      body: JSON.stringify({ vin }),
+    })
+    const j = await r.json().catch(() => ({}))
+    setBusy(false)
+    if (!r.ok) { setError(j.error || 'Could not save the VIN.'); return }
+    setDetail((d: any) => ({ ...d, vin }))
+    setEditingVin(false)
+  }
   const counts = useMemo(() => {
     const c: Record<string, number> = { all: rows.length }
     rows.forEach((r) => (c[r.status] = (c[r.status] ?? 0) + 1))
@@ -169,7 +188,26 @@ export default function TechInspectionPage() {
               <p>Class: <b>{detail.class_name || '—'}</b></p>
               <p>Machine: <b>{detail.vehicle_description || '—'}</b></p>
               {detail.registration_number && <p>Registration: <b>{detail.registration_number}</b></p>}
-              <p>VIN: <b>{detail.vin || '—'}</b></p>
+                 {editingVin ? (
+                <p>
+                  VIN:{' '}
+                  <input
+                    value={vinDraft}
+                    onChange={(e) => setVinDraft(e.target.value.toUpperCase())}
+                    maxLength={40}
+                    autoCapitalize="characters"
+                    autoComplete="off"
+                    style={{ width: 'auto', minWidth: 220 }}
+                  />{' '}
+                  <button disabled={busy} onClick={saveVin}>Save</button>{' '}
+                  <button disabled={busy} onClick={() => setEditingVin(false)}>Cancel</button>
+                </p>
+              ) : (
+                <p>
+                  VIN: <b>{detail.vin || '—'}</b>{' '}
+                  <button onClick={() => { setVinDraft(detail.vin ?? ''); setEditingVin(true) }}>Edit</button>
+                </p>
+              )}
               <p>Submitted: <b>{fmt(detail.submitted_at)}</b></p>
               <p>Rider signed: <b>{detail.rider_printed_name}</b> ({fmt(detail.rider_signed_at)})</p>
               {detail.is_junior && (
