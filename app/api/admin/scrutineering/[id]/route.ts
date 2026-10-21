@@ -42,6 +42,27 @@ export async function PATCH(request: NextRequest, context: any) {
   }
   const { id } = await context.params
   const body = await request.json()
+
+  // VIN correction: only the VIN is updated, status and notes are left alone
+  if (body.vin !== undefined) {
+    const vin = String(body.vin ?? '').trim().toUpperCase()
+    if (!vin) {
+      return NextResponse.json({ error: 'The VIN cannot be empty.' }, { status: 400 })
+    }
+    if (vin.length > 40) {
+      return NextResponse.json({ error: 'The VIN is too long.' }, { status: 400 })
+    }
+
+    const { error } = await supabaseAdmin
+      .from('scrutineering_submissions')
+      .update({ vin })
+      .eq('id', id)
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ success: true })
+  }
+
+  // Status and review notes (unchanged)
   const status = String(body.status ?? '')
   const reviewNotes = String(body.reviewNotes ?? '').trim() || null
 
