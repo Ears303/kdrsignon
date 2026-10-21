@@ -72,6 +72,10 @@ export async function POST(request: Request) {
 
     const now = new Date().toISOString();
 
+    // A VIN shorter than 17 characters is sent to review automatically
+    const shortVin = vin.replace(/\s+/g, "").length < 17;
+    const hasFail = answers.some((a) => a.result === "fail");
+
     const { data: submission, error: submissionError } = await supabaseAdmin
       .from("scrutineering_submissions")
       .insert({
@@ -91,7 +95,8 @@ export async function POST(request: Request) {
         parent_guardian_printed_name: isJunior ? parentName : null,
         parent_guardian_signature: isJunior ? parentName : null,
         parent_guardian_signed_at: isJunior ? now : null,
-        status: answers.some((a) => a.result === "fail") ? "requires_review" : "submitted",
+        status: hasFail || shortVin ? "requires_review" : "submitted",
+        review_notes: shortVin ? "VIN is shorter than 17 characters - please check." : null,
       })
       .select("id")
       .single();
