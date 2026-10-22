@@ -27,7 +27,7 @@ interface Recent {
   label: string
   at: string
   stageId?: string
-  point?: 'start' | 'finish'
+  point?: ScanPoint
 }
 
 const STATION_KEY = 'kdr:station'
