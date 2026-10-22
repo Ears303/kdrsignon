@@ -1,6 +1,6 @@
 export type EntrantType = 'car' | 'bike'
 export type EntrantStatus = 'active' | 'withdrawn' | 'dns' | 'medical_suspended'
-export type ScanPoint = 'start' | 'finish'
+export type ScanPoint = 'start' | 'finish' | 'sight_out' | 'sight_in'
 export type Method = 'camera' | 'scanner' | 'manual'
 export type Role = 'admin' | 'control' | 'scanner' | 'viewer' | 'medical' | 'dnf_entry' | 'scrutineer'
 
