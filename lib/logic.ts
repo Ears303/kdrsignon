@@ -151,7 +151,7 @@ export function findEntrant(entrants: Entrant[], raw: string, stationType: Entra
 
 // ------------------------------------------------------------------ scan decisions
 
-export type Mode = 'briefing' | 'start' | 'finish' | 'dnf'
+export type Mode = 'briefing' | 'start' | 'finish' | 'dnf' | 'sight_out' | 'sight_in'
 
 export interface Recorded {
   briefing: BriefingRow[]
@@ -198,6 +198,19 @@ export function decideScan(args: {
   const dnf = recorded.results.find(r => r.entrant_id === entrant.id && r.stage_id === stageId && r.status === 'dnf')
   const stageScan = (point: ScanPoint) =>
     recorded.scans.find(s => s.entrant_id === entrant.id && s.stage_id === stageId && s.point === point)
+
+  // sight lap (bikes, Prologue): tracking only, out then in
+  if (mode === 'sight_out' || mode === 'sight_in') {
+    const seen = stageScan(mode)
+    if (seen) {
+      return { kind: 'duplicate', entrant, at: seen.scanned_at, what: mode === 'sight_out' ? 'Sight lap out already recorded' : 'Sight lap in already recorded' }
+    }
+    if (inactive) return inactive
+    if (mode === 'sight_in' && !stageScan('sight_out')) {
+      return { kind: 'record', entrant, warning: 'No sight lap out scan on file.' }
+    }
+    return { kind: 'record', entrant }
+  }
 
   if (mode === 'dnf') {
     if (dnf) return { kind: 'duplicate', entrant, at: dnf.recorded_at, what: 'DNF already recorded' }
