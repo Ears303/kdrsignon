@@ -8,7 +8,7 @@ import { findByLicence, findEntrants } from '@/lib/lookup'
 import { signal } from '@/lib/feedback'
 import { readQueue, useQueue, type QueueTable } from '@/lib/useQueue'
 import { useEventData } from '@/lib/useEventData'
-import type { Entrant, EntrantType, EventData, Method } from '@/lib/types'
+import type { Entrant, EntrantType, EventData, Method, ScanPoint } from '@/lib/types'
 
 interface Station { type: EntrantType; mode: Mode; stageId: string | null }
 interface Feedback {
@@ -27,13 +27,15 @@ interface Recent {
   label: string
   at: string
   stageId?: string
-  point?: 'start' | 'finish'
+  point?: ScanPoint
 }
 
 const STATION_KEY = 'kdr:station'
 const MODES: { id: Mode; label: string }[] = [
-  { id: 'briefing', label: 'Briefing' }, { id: 'start', label: 'Start' }, { id: 'finish', label: 'Finish' }, { id: 'dnf', label: 'DNF' },
+  { id: 'briefing', label: 'Briefing' }, { id: 'sight_out', label: 'Sight lap out' }, { id: 'sight_in', label: 'Sight lap in' },
+  { id: 'start', label: 'Start' }, { id: 'finish', label: 'Finish' }, { id: 'dnf', label: 'DNF' },
 ]
+const isSight = (m: Mode) => m === 'sight_out' || m === 'sight_in'
 const time = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 const who = (e: Entrant) => [e.primary_name, e.secondary_name].filter(Boolean).join(' / ')
 const licenceOf = (e: Entrant) => (e as Entrant & { ridernet_id?: string | null }).ridernet_id ?? ''
@@ -45,7 +47,7 @@ function overlayPending(eventId: string) {
     for (const i of items) {
       const r = i.row as Record<string, string>
       if (i.table === 'briefing_attendance') out.briefing.push({ entrant_id: r.entrant_id, stage_id: r.stage_id, attended_at: r.attended_at })
-      else if (i.table === 'stage_scans') out.scans.push({ entrant_id: r.entrant_id, stage_id: r.stage_id, point: r.point as 'start' | 'finish', scanned_at: r.scanned_at })
+      else if (i.table === 'stage_scans') out.scans.push({ entrant_id: r.entrant_id, stage_id: r.stage_id, point: r.point as ScanPoint, scanned_at: r.scanned_at })
       else out.results.push({ entrant_id: r.entrant_id, stage_id: r.stage_id, status: 'dnf', reason: r.reason ?? null, recorded_at: r.recorded_at })
     }
     return out
@@ -139,6 +141,14 @@ function Content() {
   // every mode (briefing, start, finish, DNF) now belongs to a specific stage: Prologue, Lap 1, Lap 2, Lap 3
   const needsStage = true
 
+  // sight lap scans (out / in) are for bikes in the Prologue only
+  const sightOk = station.type === 'bike' && (stage?.name ?? '').trim().toLowerCase() === 'prologue'
+  useEffect(() => {
+    if (isSight(station.mode) && !sightOk) {
+      setStation(s => ({ ...s, mode: scanModes.find(m => !isSight(m)) ?? 'start' }))
+    }
+  }, [sightOk, station.mode, scanModes])
+
   // ---- progress counter for the current station
   const progress = useMemo(() => {
     const ofType = data.entrants.filter(e => e.entrant_type === station.type && e.status === 'active')
@@ -172,12 +182,12 @@ function Content() {
     } else {
       table = 'stage_scans'
       row = { event_id: eventId, entrant_id: entrant.id, stage_id: stage!.id, point: mode, scanned_at: now, method }
-      label = `${mode === 'start' ? 'Start' : 'Finish'} · ${stage!.name}`
+      label = `${mode === 'sight_out' ? 'Sight lap out' : mode === 'sight_in' ? 'Sight lap in' : mode === 'start' ? 'Start' : 'Finish'} · ${stage!.name}`
       setData(d => ({ ...d, scans: [...d.scans, { entrant_id: entrant.id, stage_id: stage!.id, point: mode, scanned_at: now }] }))
     }
     const qid = queue.enqueue(table, row)
-    setRecent(r => [{ key: qid, qid, table, entrant, label, at: now, stageId: stage?.id, point: mode === 'start' || mode === 'finish' ? mode : undefined }, ...r].slice(0, 20))
-    const verb = mode === 'briefing' ? 'BRIEFING OK' : mode === 'dnf' ? 'DNF RECORDED' : mode === 'start' ? 'START RECORDED' : 'FINISH RECORDED'
+    setRecent(r => [{ key: qid, qid, table, entrant, label, at: now, stageId: stage?.id, point: mode === 'briefing' || mode === 'dnf' ? undefined : mode }, ...r].slice(0, 20))
+    const verb = mode === 'briefing' ? 'BRIEFING OK' : mode === 'dnf' ? 'DNF RECORDED' : mode === 'sight_out' ? 'SIGHT LAP OUT' : mode === 'sight_in' ? 'SIGHT LAP IN' : mode === 'start' ? 'START RECORDED' : 'FINISH RECORDED'
     setFb({
       tone: warning ? 'warn' : 'ok', big: `#${entrant.competition_number}`, what: verb,
       who: who(entrant),
@@ -227,13 +237,15 @@ function Content() {
     // Briefing: licence (RidernetID) first. Everywhere: number, RidernetID, scan code or name.
     let matches: Entrant[] = station.mode === 'briefing' ? findByLicence(data.entrants, c) : []
     if (!matches.length) matches = findEntrants(data.entrants, c).map(h => h.entrant)
-        // Co-drivers share a race number as 660_1, 660_2 ... so typing 660 lists them all
+
+    // Co-drivers share a race number as 660_1, 660_2 ... so typing 660 lists them all
     const q = c.toUpperCase()
     const sharing = data.entrants.filter(e => {
       const n = e.competition_number.toUpperCase()
       return e.entrant_type === station.type && (n === q || n.startsWith(q + '_'))
     })
     if (sharing.length > 1) matches = sharing
+
     // same number in bike and car: keep the one for this station
     if (matches.length > 1) {
       const ofType = matches.filter(e => e.entrant_type === station.type)
@@ -289,7 +301,8 @@ function Content() {
     setFb(null)
   }
 
-  const heading = `${station.type.toUpperCase()} · ${needsStage ? (stage?.name ?? '—').toUpperCase() + ' · ' : ''}${station.mode.toUpperCase()}`
+  const modeLabel = MODES.find(m => m.id === station.mode)?.label ?? station.mode
+  const heading = `${station.type.toUpperCase()} · ${needsStage ? (stage?.name ?? '—').toUpperCase() + ' · ' : ''}${modeLabel.toUpperCase()}`
   const placeholder = station.mode === 'briefing'
     ? 'Scan licence, or type RidernetID / number / name + Enter'
     : 'Scan, or type number / RidernetID / name + Enter'
@@ -313,7 +326,7 @@ function Content() {
             {(['bike', 'car'] as const).filter(t => scanTypes.includes(t)).map(t => <button key={t} className={station.type === t ? 'on' : ''} onClick={() => update({ type: t })}>{t.toUpperCase()}</button>)}
           </div>
           <div className="seg">
-            {MODES.filter(m => scanModes.includes(m.id)).map(m => <button key={m.id} className={station.mode === m.id ? 'on' : ''} onClick={() => update({ mode: m.id })}>{m.label}</button>)}
+            {MODES.filter(m => scanModes.includes(m.id) && (!isSight(m.id) || sightOk)).map(m => <button key={m.id} className={station.mode === m.id ? 'on' : ''} onClick={() => update({ mode: m.id })}>{m.label}</button>)}
           </div>
         </div>
         {needsStage && (
