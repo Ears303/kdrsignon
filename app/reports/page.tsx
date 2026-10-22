@@ -4,7 +4,7 @@ import { Shell } from '@/components/Shell'
 import { useApp } from '@/components/AppProvider'
 import { getSupabase } from '@/lib/supabase'
 import { useEventData } from '@/lib/useEventData'
-import { computeReport, toCsv } from '@/lib/logic'
+import { byNumber, computeReport, toCsv } from '@/lib/logic'
 import { downloadText } from '@/lib/download'
 import type { Entrant, EntrantType } from '@/lib/types'
 
@@ -63,6 +63,17 @@ function Content() {
   const rep = useMemo(() => stage ? computeReport({
     entrants: data.entrants, type, stageId: stage.id, briefing: data.briefing, scans: data.scans, results: data.results,
   }) : null, [data, type, stage])
+
+  // bikes out on the Prologue sight lap and not yet back (tracking only)
+  const sightApplies = !!stage && type === 'bike' && stage.name.trim().toLowerCase() === 'prologue'
+  const sightOut = useMemo(() => {
+    if (!sightApplies || !stage) return []
+    const out = new Set(data.scans.filter(s => s.stage_id === stage.id && s.point === 'sight_out').map(s => s.entrant_id))
+    const back = new Set(data.scans.filter(s => s.stage_id === stage.id && s.point === 'sight_in').map(s => s.entrant_id))
+    return data.entrants
+      .filter(e => e.entrant_type === 'bike' && e.status === 'active' && out.has(e.id) && !back.has(e.id))
+      .sort(byNumber)
+  }, [data, stage, sightApplies])
 
   async function markDnf(e: Entrant) {
     if (!stage) return
@@ -151,6 +162,11 @@ function Content() {
                 </tbody></table></div>
             )}
           </div>
+
+          {sightApplies && (
+            <List title="Out on sight lap (not yet back)" hint="Scanned out on the Prologue sight lap, no sight lap in scan yet."
+              rows={sightOut} filename={`${type}-sight-lap-out.csv`} />
+          )}
 
           <List title="Missing — on course (started, not finished)" hint="Started this stage, no finish scan and not DNF. Chase these first."
             rows={rep.finish.onCourse} filename={`${type}-${stage!.name}-on-course.csv`}
