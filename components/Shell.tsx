@@ -18,6 +18,7 @@ const NAV: { href: string; label: string; show: (a: App) => boolean }[] = [
   { href: '/labels', label: 'Labels', show: a => a.canManage },
   { href: '/medical', label: 'Medical', show: a => a.canMedical },
   { href: '/tech-inspection', label: 'Tech Inspection', show: a => a.canReview },
+  { href: '/notes', label: 'Notes', show: a => a.canNotes },
 ]
 
 export function Shell({ children, needEvent = false }: { children: React.ReactNode; needEvent?: boolean }) {
