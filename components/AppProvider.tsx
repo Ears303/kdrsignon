@@ -24,7 +24,6 @@ interface Ctx {
   canReports: boolean // may see reports: admin, control, viewer or medical
   canEntrants: boolean // may see the entrant list: admin, control or viewer
   canNotes: boolean // admin or control: official notes
-  canNotes: is('admin', 'control'),
   scanTypes: EntrantType[] // vehicle types the scan page offers
   scanModes: Mode[] // scan modes the scan page offers
   signOut: () => Promise<void>
@@ -112,6 +111,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     canReview: is('admin', 'control', 'scrutineer'),
     canReports: is('admin', 'control', 'viewer', 'medical'),
     canEntrants: is('admin', 'control', 'viewer'),
+    canNotes: is('admin', 'control'),
     scanTypes, scanModes,
     signOut: async () => { await getSupabase().auth.signOut(); setRole(null); setScope('both'); setEvents([]) },
   }
