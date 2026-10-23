@@ -228,6 +228,11 @@ function Content() {
     handle([e], String(e.competition_number), method, shown)
   }, [handle])
 
+  // from the "Which entrant?" list: record this one but keep the list open for the others
+  const pick = useCallback((e: Entrant, method: Method, shown: string) => {
+    handle([e], String(e.competition_number), method, shown)
+  }, [handle])
+
   const submit = useCallback((raw: string, method: Method) => {
     const c = raw.trim()
     if (!c) return
@@ -303,6 +308,13 @@ function Content() {
 
   const modeLabel = MODES.find(m => m.id === station.mode)?.label ?? station.mode
   const heading = `${station.type.toUpperCase()} · ${needsStage ? (stage?.name ?? '—').toUpperCase() + ' · ' : ''}${modeLabel.toUpperCase()}`
+  // has this entrant already been recorded for the current mode and stage?
+  const isRecorded = (e: Entrant) => {
+    if (!stage) return false
+    if (station.mode === 'briefing') return data.briefing.some(b => b.entrant_id === e.id && b.stage_id === stage.id)
+    if (station.mode === 'dnf') return data.results.some(r => r.entrant_id === e.id && r.stage_id === stage.id && r.status === 'dnf')
+    return data.scans.some(s => s.entrant_id === e.id && s.stage_id === stage.id && s.point === station.mode)
+  }
   const placeholder = station.mode === 'briefing'
     ? 'Scan licence, or type RidernetID / number / name + Enter'
     : 'Scan, or type number / RidernetID / name + Enter'
@@ -387,13 +399,13 @@ function Content() {
                     <td>{who(e)}</td>
                     <td>{e.entrant_type.toUpperCase()}</td>
                     <td className="muted">{licenceOf(e)}</td>
-                    <td><button className="primary" onClick={() => runFor(e, choices.method, String(e.competition_number))}>Select</button></td>
+                    <td><button className="primary" disabled={isRecorded(e)} onClick={() => pick(e, choices.method, String(e.competition_number))}>{isRecorded(e) ? 'Recorded ✓' : 'Select'}</button></td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <button className="link" onClick={() => { setChoices(null); setFb(null) }}>Cancel</button>
+          <button className="primary" onClick={() => { setChoices(null); setFb(null) }}>Done</button>
         </div>
       )}
 
