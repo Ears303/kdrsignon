@@ -116,6 +116,7 @@ function Content() {
   const [sound, setSound] = useState(true)
   const [undoMsg, setUndoMsg] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
+  const reasonRef = useRef<HTMLInputElement>(null)
   const firstKey = useRef(0)
 
   // restore the saved station setup
@@ -160,7 +161,12 @@ function Content() {
     return { done, total: ofType.length }
   }, [data, station.type, station.mode, stage])
 
-  const focusInput = useCallback(() => { if (!camera) inputRef.current?.focus() }, [camera])
+  // keep the cursor in the scan box, but never steal it while someone is typing a DNF reason
+  const focusInput = useCallback(() => {
+    if (camera) return
+    if (reasonRef.current && document.activeElement === reasonRef.current) return
+    inputRef.current?.focus()
+  }, [camera])
   useEffect(() => { focusInput() }, [focusInput, station, state])
 
   // ---- record
@@ -356,7 +362,7 @@ function Content() {
         </p>
 
         {station.mode === 'dnf' && (
-          <label>Reason (optional, applies to the next DNFs)<input value={reason} onChange={e => setReason(e.target.value)} placeholder="e.g. mechanical, crash, retired" /></label>
+          <label>Reason (optional, applies to the next DNFs)<input ref={reasonRef} value={reason} onChange={e => setReason(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); inputRef.current?.focus() } }} placeholder="e.g. mechanical, crash, retired" /></label>
         )}
 
         <input
