@@ -24,6 +24,7 @@ interface Ctx {
   canReports: boolean // may see reports: admin, control, viewer or medical
   canEntrants: boolean // may see the entrant list: admin, control or viewer
   canNotes: boolean // admin or control: official notes
+  canRaceControl: is('admin', 'control'),
   scanTypes: EntrantType[] // vehicle types the scan page offers
   scanModes: Mode[] // scan modes the scan page offers
   signOut: () => Promise<void>
