@@ -115,8 +115,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     canNotes: is('admin', 'control'),
     canRaceControl: is('admin', 'control'),
     scanTypes, scanModes,
-    canNotes: is('admin', 'control'),
-    scanTypes, scanModes,
     signOut: async () => { await getSupabase().auth.signOut(); setRole(null); setScope('both'); setEvents([]) },
   }
   return <AppCtx.Provider value={value}>{children}</AppCtx.Provider>
