@@ -12,8 +12,18 @@ import type { CSSProperties } from "react";
 const DEFAULT_EVENT_ID = "84416171-e055-4014-a002-21110af8eff1";
 const REFRESH_SECONDS = 10;
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
+// Next.js only exposes variables starting NEXT_PUBLIC_ to the browser.
+// Several common names are tried so this matches the existing app settings.
+const supabaseUrl =
+  process.env.NEXT_PUBLIC_SUPABASE_URL ??
+  process.env.NEXT_PUBLIC_SUPABASE_PROJECT_URL ??
+  "";
+const supabaseKey =
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY ??
+  process.env.NEXT_PUBLIC_SUPABASE_KEY ??
+  "";
 const supabase =
   supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
 
@@ -159,7 +169,7 @@ export default function CourseTrackPage() {
 
     if (!supabase) {
       setError(
-        "Supabase settings missing. Check NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Vercel."
+        `Supabase settings missing in the browser. URL found: ${supabaseUrl ? "yes" : "no"}. Key found: ${supabaseKey ? "yes" : "no"}. Check the variable names in Vercel start with NEXT_PUBLIC_ and redeploy.`
       );
       setLoading(false);
       return;
