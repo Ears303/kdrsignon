@@ -17,9 +17,11 @@ const NAV: { href: string; label: string; show: (a: App) => boolean }[] = [
   { href: '/entrants', label: 'Entrants', show: a => a.canEntrants },
   { href: '/labels', label: 'Labels', show: a => a.canManage },
   { href: '/medical', label: 'Medical', show: a => a.canMedical },
+  { href: '/medical/board', label: 'Medical board', show: a => a.canMedical },
   { href: '/tech-inspection', label: 'Tech Inspection', show: a => a.canReview },
   { href: '/notes', label: 'Notes', show: a => a.canNotes },
   { href: '/race-control', label: 'Race control', show: a => a.canRaceControl },
+  { href: '/course-track', label: 'Course board', show: a => a.canRaceControl },
 ]
 
 export function Shell({ children, needEvent = false }: { children: React.ReactNode; needEvent?: boolean }) {
@@ -39,8 +41,11 @@ export function Shell({ children, needEvent = false }: { children: React.ReactNo
   }
   if (!app.ready || !app.session) return <div className="wrap muted">Loading…</div>
 
-  // the page being viewed, if it is one of the menu pages (sub-pages count too)
-  const current = NAV.find(n => n.href !== '/' && (path === n.href || path.startsWith(n.href + '/')))
+  // the page being viewed, if it is one of the menu pages (sub-pages count too).
+  // Longest matching address wins, so /medical/board uses its own entry.
+  const current = NAV
+    .filter(n => n.href !== '/' && (path === n.href || path.startsWith(n.href + '/')))
+    .sort((a, b) => b.href.length - a.href.length)[0]
   const blocked = !!app.role && !!current && !current.show(app)
 
   return (
@@ -84,3 +89,4 @@ export function Shell({ children, needEvent = false }: { children: React.ReactNo
     </>
   )
 }
+// END OF FILE
