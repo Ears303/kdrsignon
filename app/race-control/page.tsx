@@ -1,4 +1,11 @@
 'use client'
+// FILE LOCATION IN GITHUB: replace your existing race control log page
+// (the page.tsx you pasted, e.g. app/race-control/page.tsx).
+// Race control log and course control now sit on ONE page:
+//   wide screen  -> side by side (log left, course control right)
+//   tablet/phone -> stacked, with quick-jump buttons at the top
+// The race control log code is unchanged apart from the layout wrapper.
+
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Shell } from '@/components/Shell'
 import { useApp } from '@/components/AppProvider'
@@ -6,6 +13,7 @@ import { getSupabase } from '@/lib/supabase'
 import { toCsv } from '@/lib/logic'
 import { downloadText } from '@/lib/download'
 import type { Stage } from '@/lib/types'
+import { CourseControlPanel } from '@/components/CourseControlPanel'
 
 interface Caller { id: string; name: string; sort_order: number }
 interface Entry {
@@ -36,7 +44,7 @@ const ago = (iso: string) => {
   return `${Math.floor(m / 60)} h ${m % 60} min`
 }
 
-function Content() {
+function RaceLog() {
   const { event, session } = useApp()
   const [entries, setEntries] = useState<Entry[]>([])
   const [callers, setCallers] = useState<Caller[]>([])
@@ -188,7 +196,7 @@ function Content() {
   return (
     <>
       <div className="row" style={{ justifyContent: 'space-between' }}>
-        <h1>Race control log</h1>
+        <h1 style={{ margin: 0 }}>Race control log</h1>
         <span className={`pill ${openCount ? 'bad' : 'ok'}`}>{openCount} outstanding</span>
       </div>
 
@@ -277,4 +285,42 @@ function Content() {
   )
 }
 
+/* ------------------------------------------------------------
+   COMBINED PAGE: race control log + course control
+   ------------------------------------------------------------ */
+
+function Content() {
+  const jump = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+
+  return (
+    <>
+      {/* quick jump - mainly for tablets/phones where the two halves stack */}
+      <div className="row" style={{ position: 'sticky', top: 0, zIndex: 20, background: 'inherit', padding: '6px 0' }}>
+        <button onClick={() => jump('race-log')}>📋 Race log</button>
+        <button onClick={() => jump('course-control')}>🏍️ Course control</button>
+        <a href="/course-track" target="_blank" rel="noreferrer">
+          <button type="button">🗺️ Course board ↗</button>
+        </a>
+      </div>
+
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(480px, 1fr))',
+          gap: 16,
+          alignItems: 'start',
+        }}
+      >
+        <section id="race-log" style={{ minWidth: 0 }}>
+          <RaceLog />
+        </section>
+        <section id="course-control" style={{ minWidth: 0 }}>
+          <CourseControlPanel />
+        </section>
+      </div>
+    </>
+  )
+}
+
 export default function Page() { return <Shell needEvent><Content /></Shell> }
+// END OF FILE
